@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Altea CM Inbound Connection Bag Calculator for CLC</title>
+  <title>Altea CM Inbound Connection DOM / INT Bag Calculator for CLC</title>
   <style>
     :root {
       --primary: #4a148c;
@@ -207,7 +207,7 @@
 
     .station-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
       gap: 10px;
       margin-bottom: 16px;
     }
@@ -219,11 +219,48 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      cursor: pointer;
+      transition: transform 0.12s, box-shadow 0.12s, filter 0.12s;
+      text-align: left;
     }
+    .station-item:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+      filter: brightness(0.98);
+    }
+    .station-item.alert-missed_conx {
+      background: var(--missed-conx-row);
+      border: 1.5px solid var(--missed-conx-border);
+    }
+    .station-item.alert-danger {
+      background: var(--danger-row);
+      border: 1.5px solid var(--danger-border);
+    }
+    .station-item.alert-warn {
+      background: var(--warn-row);
+      border: 1.5px solid var(--warn-border);
+    }
+    .station-item.alert-long {
+      background: var(--success-row);
+      border: 1.5px solid var(--success-border);
+    }
+
     .station-code { font-weight: 800; font-size: 1rem; color: var(--text); }
     .station-meta { font-size: 0.75rem; color: var(--muted); }
+    .station-alert-tag {
+      display: inline-block;
+      margin-top: 4px;
+      padding: 1px 6px;
+      border-radius: 99px;
+      font-size: 0.68rem;
+      font-weight: 700;
+    }
     .station-bags { font-size: 1.15rem; font-weight: 800; color: var(--primary); }
     .station-bags.dom-val { color: var(--dom-text); }
+    .station-item.alert-missed_conx .station-bags { color: var(--missed-conx-bg); }
+    .station-item.alert-danger .station-bags { color: var(--danger-text); }
+    .station-item.alert-warn .station-bags { color: var(--warn-text); }
+    .station-item.alert-long .station-bags { color: var(--success-text); }
 
     .table-wrap { max-height: 380px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
     table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
@@ -244,6 +281,7 @@
       vertical-align: middle;
       white-space: nowrap;
     }
+    #resultBody tr { cursor: pointer; }
     tr:hover { background: #f8fafc; }
     tr.missed-conx-row { background: var(--missed-conx-row); }
     tr.missed-conx-row:hover { background: #fca5a5; }
@@ -284,6 +322,96 @@
       border: 1px dashed #cbd5e1;
       line-height: 1.45;
     }
+
+    /* Popup Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.55);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 1000;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal-panel {
+      background: #ffffff;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 720px;
+      max-height: 88vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--border);
+    }
+    .modal-header {
+      background: linear-gradient(135deg, var(--primary), var(--primary-light));
+      color: #ffffff;
+      padding: 14px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal-header h3 {
+      margin: 0;
+      font-size: 1.05rem;
+    }
+    .modal-close {
+      background: rgba(255, 255, 255, 0.2);
+      color: #ffffff;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+    }
+    .modal-close:hover {
+      background: rgba(255, 255, 255, 0.32);
+    }
+    .modal-body {
+      padding: 18px;
+      overflow-y: auto;
+    }
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 560px) { .detail-grid { grid-template-columns: 1fr; } }
+    .detail-box {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+    .detail-label {
+      font-size: 0.74rem;
+      color: var(--muted);
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .detail-val {
+      font-size: 1rem;
+      font-weight: 800;
+      color: var(--text);
+      margin-top: 2px;
+    }
+    .modal-summary-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 14px;
+      font-size: 0.84rem;
+    }
+    .modal-pill {
+      background: #f3e8ff;
+      color: var(--primary);
+      padding: 5px 10px;
+      border-radius: 99px;
+      font-weight: 700;
+    }
   </style>
 </head>
 <body>
@@ -291,7 +419,7 @@
 <div class="container">
   <header>
     <div>
-      <h1>「Altea CM Inbound Connection Bag Calculator for CLC」 ✦Version 1.1.1✦</h1>
+      <h1>「Altea CM Inbound Connection DOM / INT Bag Calculator for CLC」 ✦Version 1.2.1✦</h1>
       <span>คำนวณยอดกระเป๋าต่อเครื่องเข้าเที่ยวบินหลัก · เรียงตามระยะเวลาต่อเครื่อง CONX (น้อย → มาก) · แจ้งเตือนตามเงื่อนไขเวลาต่อเครื่อง</span>
     </div>
   </header>
@@ -309,7 +437,8 @@
         <div class="note-box">
           <b>เงื่อนไขการนับและแจ้งเตือน:</b><br>
           • ดูจาก <b>Inbound ขาเข้า (DEP)</b> เป็นหลัก: สนามบินในไทย = <b>DOM</b> / ต่างประเทศ = <b>INTER</b><br>
-          • เลขไฟลท์ตัดเลข 0 นำหน้าออกอัตโนมัติ (ไม่ขึ้นต้นด้วย 0) และรองรับไฟลท์มีตัวอักษรต่อท้าย เช่น <code>TG925D</code>
+          • เลขไฟลท์ตัดเลข 0 นำหน้าออกอัตโนมัติ (ไม่ขึ้นต้นด้วย 0) และรองรับไฟลท์มีตัวอักษรต่อท้าย เช่น <code>TG925D</code><br>
+          • คลิกที่กล่องสถานี <b>DEP</b> หรือแถวไฟลท์เพื่อดูรายละเอียดแบบ Popup
         </div>
         <div class="controls">
           <button class="btn-clear" onclick="clearAll()">ล้างข้อมูล</button>
@@ -385,351 +514,17 @@
   </div>
 </div>
 
-<script>
-  const HISTORY_STORAGE_KEY = 'altea_clc_search_history_v1';
-  const MAX_HISTORY_ITEMS = 30;
-  let saveHistoryTimer = null;
+<!-- Popup Detail Modal -->
+<div id="detailModal" class="modal-backdrop" onclick="handleBackdropClick(event)">
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-header">
+      <h3 id="modalTitle">รายละเอียด</h3>
+      <button type="button" class="modal-close" onclick="closeDetailModal()">ปิด (ESC)</button>
+    </div>
+    <div id="modalBody" class="modal-body"></div>
+  </div>
+</div>
 
-  const rawInput = document.getElementById('rawInput');
-  rawInput.addEventListener('input', () => {
-    parseAlteaData();
-    clearTimeout(saveHistoryTimer);
-    saveHistoryTimer = setTimeout(recordCurrentFlightToHistory, 400);
-  });
-
-  function loadHistory() {
-    try {
-      const raw = localStorage.getItem(HISTORY_STORAGE_KEY);
-      const parsed = raw ? JSON.parse(raw) : [];
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (e) {
-      return [];
-    }
-  }
-
-  function saveHistory(items) {
-    try {
-      localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(items));
-    } catch (e) {
-      // ignore storage quota error
-    }
-  }
-
-  function formatTimeNow() {
-    const now = new Date();
-    return now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
-  }
-
-  function recordCurrentFlightToHistory() {
-    const text = rawInput.value.trim();
-    if (!text) return;
-
-    const bannerText = document.getElementById('flightBanner').textContent.trim();
-    const headerMatch = bannerText.match(/กระเป๋าต่อเครื่องเข้าเที่ยวบิน:\s*(.+)$/);
-    const flightLabel = headerMatch ? headerMatch[1].trim() : '';
-    const totalFlights = parseInt(document.getElementById('totalFlights').textContent, 10) || 0;
-
-    if (!flightLabel && totalFlights === 0) return;
-
-    const label = flightLabel || `รายการ (${totalFlights} ไฟลท์)`;
-    const inter = document.getElementById('interTotal').textContent;
-    const dom = document.getElementById('domTotal').textContent;
-    const total = document.getElementById('grandTotal').textContent;
-
-    const history = loadHistory().filter(item => item.label !== label);
-    history.unshift({
-      id: Date.now(),
-      label,
-      inter,
-      dom,
-      total,
-      time: formatTimeNow(),
-      rawText: rawInput.value
-    });
-
-    saveHistory(history.slice(0, MAX_HISTORY_ITEMS));
-    renderSearchHistory();
-  }
-
-  function renderSearchHistory() {
-    const container = document.getElementById('historyList');
-    const history = loadHistory();
-
-    if (history.length === 0) {
-      container.innerHTML = '<div class="history-empty">ยังไม่มีประวัติไฟลท์ที่คำนวณ</div>';
-      return;
-    }
-
-    container.innerHTML = history.map(item => `
-      <div class="history-item">
-        <button type="button" class="history-select" onclick="selectHistoryItem(${item.id})">
-          <div class="history-title">${escapeHtml(item.label)}</div>
-          <div class="history-meta">INTER: ${item.inter} · DOM: ${item.dom} · TOTAL: ${item.total} (${item.time})</div>
-        </button>
-        <button type="button" class="history-del" title="ลบรายการนี้" onclick="deleteHistoryItem(${item.id})">✕</button>
-      </div>
-    `).join('');
-  }
-
-  function selectHistoryItem(id) {
-    const history = loadHistory();
-    const target = history.find(item => item.id === id);
-    if (!target) return;
-    rawInput.value = target.rawText;
-    parseAlteaData();
-  }
-
-  function deleteHistoryItem(id) {
-    const updated = loadHistory().filter(item => item.id !== id);
-    saveHistory(updated);
-    renderSearchHistory();
-  }
-
-  function clearSearchHistory() {
-    saveHistory([]);
-    renderSearchHistory();
-  }
-
-  function escapeHtml(str) {
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-  }
-
-  const TH_DOMESTIC_AIRPORTS = new Set([
-    'BKK', 'DMK', 'CNX', 'CEI', 'HKT', 'KBV', 'USM', 'TDX', 'THS',
-    'UTH', 'UBP', 'KKC', 'NST', 'HDY', 'TST', 'LPT', 'PHS', 'TAW',
-    'MAQ', 'PRH', 'NNT', 'ROI', 'BFV', 'SNO', 'NAW', 'CNQ', 'KOP', 'PXM',
-    'HGN', 'TKH', 'KDT', 'LOE', 'UNN', 'PYY', 'QHO', 'TKT', 'TDK', 'KCM'
-  ]);
-
-  function normalizeFlightNumber(rawFltnr) {
-    const clean = rawFltnr.trim().toUpperCase();
-    const match = clean.match(/^([A-Z0-9]{2})0*(\d+)([A-Z]{1,2})$/);
-    if (match) {
-      const digits = match[2] || '0';
-      return `${match[1]}${digits}${match[3]}`;
-    }
-    const numOnly = clean.match(/^0*(\d+)([A-Z]{1,2})$/);
-    if (numOnly) {
-      return `${numOnly[1] || '0'}${numOnly[2]}`;
-    }
-    return clean;
-  }
-
-  function parseConxMinutes(conxStr) {
-    const m = (conxStr || '').trim().toUpperCase().match(/^(-?)(\d{2})H(\d{2})$/);
-    if (!m) return null;
-    const sign = m[1] === '-' ? -1 : 1;
-    return sign * (parseInt(m[2], 10) * 60 + parseInt(m[3], 10));
-  }
-
-  function getConxSeverity(conxMinutes) {
-    if (conxMinutes === null) return null;
-    if (conxMinutes < 0) return 'missed_conx';
-    if (conxMinutes < 30) return 'danger';
-    if (conxMinutes <= 60) return 'warn';
-    if (conxMinutes > 360) return 'long';
-    return null;
-  }
-
-  function isInterFlight(fltnr, dep) {
-    const origin = (dep || '').trim().toUpperCase();
-    if (origin && TH_DOMESTIC_AIRPORTS.has(origin)) {
-      return false;
-    }
-
-    const match = fltnr.match(/^([A-Z0-9]{2})(\d+)([A-Z]{1,2})$/);
-    if (!match) return true;
-
-    const airline = match[1];
-    const num = parseInt(match[2], 10);
-
-    if (airline === 'TG' && num >= 100 && num <= 299) {
-      return origin ? !TH_DOMESTIC_AIRPORTS.has(origin) : false;
-    }
-
-    return true;
-  }
-
-  function parseAlteaData() {
-    const text = rawInput.value;
-    const lines = text.split(/\r?\n/);
-
-    let currentSection = 'NORMAL';
-    let headerInfo = '';
-    const flights = [];
-
-    const flightRegex = /^\s*([A-Z0-9]{2}\d{1,4}[A-Z]{0,2})\s+([AE]?\d{4})\s+([A-Z]{3})\s+([A-Z]{3})\s+(-?\d{2}H\d{2})\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*$/i;
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (!line) continue;
-
-      if (/^TG\d+[A-Z]{0,2}\s+\d{2}[A-Z]{3}\s+[A-Z]{3}/i.test(line)) {
-        headerInfo = line;
-      }
-
-      if (line.includes('POTENTIALLY MISSED INBOUND CONNECTION')) {
-        currentSection = 'MISSED';
-        continue;
-      }
-      if (line.includes('INBOUND CONNECTION') && !line.includes('POTENTIALLY MISSED')) {
-        currentSection = 'NORMAL';
-        continue;
-      }
-
-      const match = line.match(flightRegex);
-      if (match) {
-        const fltnr = normalizeFlightNumber(match[1]);
-        const sta = match[2].toUpperCase();
-        const dep = match[3].toUpperCase();
-        const dest = match[4].toUpperCase();
-        const conx = match[5].toUpperCase();
-        const conxMinutes = parseConxMinutes(conx);
-        const conxSeverity = getConxSeverity(conxMinutes);
-        const bagsTtl = parseInt(match[10], 10);
-        const isMissed = (currentSection === 'MISSED');
-
-        flights.push({
-          fltnr,
-          sta,
-          dep,
-          dest,
-          route: `${dep}-${dest}`,
-          conx,
-          conxMinutes,
-          conxSeverity,
-          isInter: isInterFlight(fltnr, dep),
-          isMissed,
-          bags: bagsTtl
-        });
-      }
-    }
-
-    renderResults(flights, headerInfo);
-  }
-
-  function renderResults(flights, headerInfo) {
-    const banner = document.getElementById('flightBanner');
-    if (headerInfo) {
-      banner.style.display = 'block';
-      banner.textContent = `กระเป๋าต่อเครื่องเข้าเที่ยวบิน: ${headerInfo}`;
-    } else {
-      banner.style.display = 'none';
-    }
-
-    let interBags = 0, interCount = 0;
-    let domBags = 0, domCount = 0;
-    const stationMap = {};
-
-    flights.forEach(f => {
-      if (f.isInter) {
-        interBags += f.bags;
-        interCount++;
-      } else {
-        domBags += f.bags;
-        domCount++;
-      }
-
-      const key = `${f.dep}_${f.isInter ? 'INTER' : 'DOM'}`;
-      if (!stationMap[key]) {
-        stationMap[key] = { dep: f.dep, bags: 0, flightCount: 0, isInter: f.isInter };
-      }
-      stationMap[key].bags += f.bags;
-      stationMap[key].flightCount += 1;
-    });
-
-    document.getElementById('interTotal').textContent = interBags;
-    document.getElementById('interFlights').textContent = `${interCount} ไฟลท์`;
-    document.getElementById('domTotal').textContent = domBags;
-    document.getElementById('domFlights').textContent = `${domCount} ไฟลท์`;
-    document.getElementById('grandTotal').textContent = interBags + domBags;
-    document.getElementById('totalFlights').textContent = `${flights.length} ไฟลท์`;
-
-    const stationContainer = document.getElementById('stationBreakdown');
-    const stations = Object.values(stationMap).sort((a, b) => a.dep.localeCompare(b.dep));
-
-    if (stations.length === 0) {
-      stationContainer.innerHTML = '<div style="color:#94a3b8; font-size:0.86rem;">ไม่พบข้อมูลสถานีต้นทาง</div>';
-    } else {
-      stationContainer.innerHTML = stations.map(s => `
-        <div class="station-item">
-          <div>
-            <div class="station-code">${s.dep}</div>
-            <div class="station-meta">${s.flightCount} ไฟลท์ · ${s.isInter ? 'INTER' : 'DOM'}</div>
-          </div>
-          <div class="station-bags ${s.isInter ? '' : 'dom-val'}">${s.bags}</div>
-        </div>
-      `).join('');
-    }
-
-    const tbody = document.getElementById('resultBody');
-    tbody.innerHTML = '';
-
-    if (flights.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:#94a3b8; padding: 26px;">ยังไม่มีข้อมูล — กรุณาวางข้อความในช่องด้านซ้าย</td></tr>';
-      return;
-    }
-
-    const sortedFlights = [...flights].sort((a, b) => {
-      const timeA = a.conxMinutes !== null ? a.conxMinutes : Number.MAX_SAFE_INTEGER;
-      const timeB = b.conxMinutes !== null ? b.conxMinutes : Number.MAX_SAFE_INTEGER;
-      return (timeA - timeB) || a.dep.localeCompare(b.dep) || a.fltnr.localeCompare(b.fltnr);
-    });
-
-    sortedFlights.forEach(f => {
-      const notices = [];
-      const rowAlert = f.conxSeverity;
-
-      if (f.conxSeverity === 'missed_conx') {
-        notices.push(`<span class="badge badge-missed-conx">MISSED CONX (${f.conxMinutes}m)</span>`);
-      } else if (f.conxSeverity === 'danger') {
-        notices.push(`<span class="badge badge-short-danger">SHORT CONX (${f.conxMinutes}m)</span>`);
-      } else if (f.conxSeverity === 'warn') {
-        notices.push(`<span class="badge badge-short-warn">SHORT CONX (${f.conxMinutes}m)</span>`);
-      } else if (f.conxSeverity === 'long') {
-        notices.push(`<span class="badge badge-long-success">ระยะเวลาต่อเครื่องมากกว่า 6 ชั่วโมง</span>`);
-      }
-
-      const noticeHtml = notices.length
-        ? `<div class="notice-line">${notices.join('')}</div>`
-        : `<span class="notice-ok">-</span>`;
-
-      const tr = document.createElement('tr');
-      if (rowAlert === 'missed_conx') {
-        tr.classList.add('missed-conx-row');
-      } else if (rowAlert === 'danger') {
-        tr.classList.add('short-danger-row');
-      } else if (rowAlert === 'warn') {
-        tr.classList.add('short-warn-row');
-      } else if (rowAlert === 'long') {
-        tr.classList.add('long-conn-row');
-      }
-
-      tr.innerHTML = `
-        <td><strong>${f.dep}</strong></td>
-        <td><strong>${f.fltnr}</strong></td>
-        <td>${f.sta}</td>
-        <td>${f.route}</td>
-        <td><strong>${f.conx}</strong></td>
-        <td><span class="badge ${f.isInter ? 'badge-inter' : 'badge-dom'}">${f.isInter ? 'INTER' : 'DOM'}</span></td>
-        <td>${noticeHtml}</td>
-        <td class="num">${f.bags}</td>
-      `;
-      tbody.appendChild(tr);
-    });
-  }
-
-  function clearAll() {
-    rawInput.value = '';
-    parseAlteaData();
-  }
-
-  renderSearchHistory();
-</script>
-
+<script src="calculator.js"></script>
 </body>
 </html>
