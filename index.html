@@ -111,8 +111,6 @@
     }
     .btn-clear { background: #e2e8f0; color: #334155; }
     .btn-clear:hover { background: #cbd5e1; }
-    .btn-copy { background: var(--primary); color: white; }
-    .btn-copy:hover { background: var(--primary-light); }
     .btn-mini-clear {
       padding: 4px 10px;
       font-size: 0.76rem;
@@ -293,7 +291,7 @@
 <div class="container">
   <header>
     <div>
-      <h1>「Altea CM Inbound Connection Bag Calculator for CLC」 ✦Version 1.1.0✦</h1>
+      <h1>「Altea CM Inbound Connection Bag Calculator for CLC」 ✦Version 1.1.1✦</h1>
       <span>คำนวณยอดกระเป๋าต่อเครื่องเข้าเที่ยวบินหลัก · เรียงตามระยะเวลาต่อเครื่อง CONX (น้อย → มาก) · แจ้งเตือนตามเงื่อนไขเวลาต่อเครื่อง</span>
     </div>
   </header>
@@ -315,7 +313,6 @@
         </div>
         <div class="controls">
           <button class="btn-clear" onclick="clearAll()">ล้างข้อมูล</button>
-          <button class="btn-copy" onclick="copySummary()">คัดลอกสรุปยอด</button>
         </div>
       </div>
 
@@ -729,49 +726,6 @@
   function clearAll() {
     rawInput.value = '';
     parseAlteaData();
-  }
-
-  function copySummary() {
-    const inter = document.getElementById('interTotal').textContent;
-    const dom = document.getElementById('domTotal').textContent;
-    const total = document.getElementById('grandTotal').textContent;
-    const banner = document.getElementById('flightBanner').textContent;
-
-    const stations = Array.from(document.querySelectorAll('.station-item')).map(el => {
-      const code = el.querySelector('.station-code').textContent;
-      const bags = el.querySelector('.station-bags').textContent;
-      return `${code}:${bags}`;
-    });
-
-    const missedRows = Array.from(document.querySelectorAll('#resultBody tr.missed-conx-row')).map(tr => {
-      const cells = tr.querySelectorAll('td');
-      return `${cells[1].textContent.trim()} (${cells[0].textContent.trim()} ${cells[4].textContent.trim()}, ${cells[7].textContent.trim()} bags)`;
-    });
-
-    const shortRows = Array.from(document.querySelectorAll('#resultBody tr.short-danger-row, #resultBody tr.short-warn-row')).map(tr => {
-      const cells = tr.querySelectorAll('td');
-      const level = tr.classList.contains('short-danger-row') ? '<30m' : '30-60m';
-      return `${cells[1].textContent.trim()} (${cells[0].textContent.trim()} ${cells[4].textContent.trim()} [${level}], ${cells[7].textContent.trim()} bags)`;
-    });
-
-    const longRows = Array.from(document.querySelectorAll('#resultBody tr.long-conn-row')).map(tr => {
-      const cells = tr.querySelectorAll('td');
-      return `${cells[1].textContent.trim()} (${cells[0].textContent.trim()} ${cells[4].textContent.trim()}, ${cells[7].textContent.trim()} bags)`;
-    });
-
-    const lines = [
-      banner,
-      `INTER BAGS: ${inter} | DOM BAGS: ${dom} | TOTAL: ${total}`,
-      stations.length ? `BY DEP: ${stations.join(', ')}` : '',
-      missedRows.length ? `MISSED CONX: ${missedRows.join(', ')}` : '',
-      shortRows.length ? `SHORT CONX (<=1H): ${shortRows.join(', ')}` : '',
-      longRows.length ? `LONG CONX (>6H): ${longRows.join(', ')}` : ''
-    ].filter(Boolean);
-
-    const summaryText = lines.join('\n');
-    navigator.clipboard.writeText(summaryText).then(() => {
-      alert('คัดลอกสรุปยอดเรียบร้อยแล้ว:\n\n' + summaryText);
-    });
   }
 
   renderSearchHistory();
