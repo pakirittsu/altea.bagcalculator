@@ -1,9 +1,10 @@
-const APP_VERSION = '1.2.1';
+const APP_VERSION = '1.2.2';
 const HISTORY_STORAGE_KEY = 'altea_clc_search_history_v1';
 const MAX_HISTORY_ITEMS = 30;
 let saveHistoryTimer = null;
 let currentParsedFlights = [];
 let currentHeaderInfo = '';
+let modalBackStack = [];
 
 const SEVERITY_PRIORITY = {
   missed_conx: 4,
@@ -25,13 +26,75 @@ function handleBackdropClick(e) {
   }
 }
 
-function openDetailModal(title, htmlContent) {
+function renderModalBackButton() {
+  const headerEl = document.querySelector('#detailModal .modal-header');
+  if (!headerEl) return;
+
+  const closeBtn = headerEl.querySelector('.modal-close:not(#modalBackBtn)');
+  let actionGroup = document.getElementById('modalHeaderActions');
+
+  if (!actionGroup) {
+    actionGroup = document.createElement('div');
+    actionGroup.id = 'modalHeaderActions';
+    actionGroup.style.display = 'flex';
+    actionGroup.style.alignItems = 'center';
+    actionGroup.style.gap = '8px';
+    if (closeBtn) {
+      headerEl.appendChild(actionGroup);
+      actionGroup.appendChild(closeBtn);
+    }
+  }
+
+  let backBtn = document.getElementById('modalBackBtn');
+  if (modalBackStack.length > 0) {
+    if (!backBtn) {
+      backBtn = document.createElement('button');
+      backBtn.type = 'button';
+      backBtn.id = 'modalBackBtn';
+      backBtn.className = 'modal-close';
+      backBtn.textContent = '← ย้อนกลับ';
+      backBtn.onclick = goBackDetailModal;
+    }
+    actionGroup.insertBefore(backBtn, closeBtn || null);
+    backBtn.style.display = 'inline-block';
+  } else if (backBtn) {
+    backBtn.style.display = 'none';
+  }
+}
+function openDetailModal(title, htmlContent, options = {}) {
+  const { pushCurrent = false, clearStack = false } = options;
+
+  if (clearStack) {
+    modalBackStack = [];
+  } else if (pushCurrent) {
+    const currentTitle = document.getElementById('modalTitle').textContent;
+    const currentHtml = document.getElementById('modalBody').innerHTML;
+    const isOpen = document.getElementById('detailModal').classList.contains('open');
+    if (isOpen && currentHtml) {
+      modalBackStack.push({ title: currentTitle, html: currentHtml });
+    }
+  }
+
   document.getElementById('modalTitle').textContent = title;
   document.getElementById('modalBody').innerHTML = htmlContent;
+  renderModalBackButton();
   document.getElementById('detailModal').classList.add('open');
 }
 
+function goBackDetailModal() {
+  const prev = modalBackStack.pop();
+  if (!prev) {
+    closeDetailModal();
+    return;
+  }
+  document.getElementById('modalTitle').textContent = prev.title;
+  document.getElementById('modalBody').innerHTML = prev.html;
+  renderModalBackButton();
+}
+
 function closeDetailModal() {
+  modalBackStack = [];
+  renderModalBackButton();
   document.getElementById('detailModal').classList.remove('open');
 }
 
@@ -186,7 +249,7 @@ function getAlertBadgeHtml(flight) {
     return `<span class="badge badge-missed-conx">MISSED CONX (${flight.conxMinutes}m)</span>`;
   }
   if (flight.conxSeverity === 'danger') {
-    return `<span class="badge badge-short-danger">SHORT CONX (${flight.conxMinutes}m)</span>`;
+    return `<span class="badge badge-short-danger">MASSIVE CONX (${flight.conxMinutes}m)</span>`;
   }
   if (flight.conxSeverity === 'warn') {
     return `<span class="badge badge-short-warn">SHORT CONX (${flight.conxMinutes}m)</span>`;
@@ -203,7 +266,7 @@ function getStationAlertTagHtml(severity, alertCount) {
     return `<span class="station-alert-tag badge-missed-conx">MISSED ${alertCount}</span>`;
   }
   if (severity === 'danger') {
-    return `<span class="station-alert-tag badge-short-danger">SHORT &lt;30m (${alertCount})</span>`;
+    return `<span class="station-alert-tag badge-short-danger">MASSIVE &lt;30m (${alertCount})</span>`;
   }
   if (severity === 'warn') {
     return `<span class="station-alert-tag badge-short-warn">SHORT 30-60m (${alertCount})</span>`;
@@ -404,7 +467,7 @@ function renderResults(flights, headerInfo) {
       : badgeHtml;
 
     const tr = document.createElement('tr');
-    tr.onclick = () => openFlightPopup(f.id);
+    tr.onclick = () => openFlightPopup(f.id, { clearStack: true });
     if (rowAlert === 'missed_conx') {
       tr.classList.add('missed-conx-row');
     } else if (rowAlert === 'danger') {
@@ -429,7 +492,95 @@ function renderResults(flights, headerInfo) {
   });
 }
 
-function openFlightPopup(flightId) {
+function buildFlightListRowsHtml(list, showCategoryCol = false) {
+  return list.map(f => {
+    const rowAlert = f.conxSeverity ? `class="${
+      f.conxSeverity === 'missed_conx' ? 'missed-conx-row' :
+      f.conxSeverity === 'danger' ? 'short-danger-row' :
+      f.conxSeverity === 'warn' ? 'short-warn-row' : 'long-conn-row'
+    }"` : '';
+
+    const categoryCell = showCategoryCol
+      ? `<td><span class="badge ${f.isInter ? 'badge-inter' : 'badge-dom'}">${f.isInter ? 'INTER' : 'DOM'}</span></td>`
+      : '';
+
+    return `
+      <tr ${rowAlert} onclick="openFlightPopup(${f.id}, { pushCurrent: true })" style="cursor:pointer;">
+        <td><strong>${escapeHtml(f.dep)}</strong></td>
+        <td><strong>${escapeHtml(f.fltnr)}</strong></td>
+        <td>${escapeHtml(f.sta)}</td>
+        <td>${escapeHtml(f.route)}</td>
+        <td><strong>${escapeHtml(f.conx)}</strong></td>
+        ${categoryCell}
+        <td>${getAlertBadgeHtml(f)}</td>
+        <td class="num">${f.bags}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function openCategoryPopup(category) {
+  let filtered = [];
+  let titleText = '';
+  let categoryLabel = '';
+
+  if (category === 'INTER') {
+    filtered = currentParsedFlights.filter(f => f.isInter);
+    titleText = 'รายการไฟลท์หมวด INTER BAGS';
+    categoryLabel = 'INTER';
+  } else if (category === 'DOM') {
+    filtered = currentParsedFlights.filter(f => !f.isInter);
+    titleText = 'รายการไฟลท์หมวด DOM BAGS';
+    categoryLabel = 'DOM';
+  } else {
+    filtered = [...currentParsedFlights];
+    titleText = 'รายการไฟลท์ทั้งหมด (รวม INTER + DOM)';
+    categoryLabel = 'ALL (INTER + DOM)';
+  }
+
+  if (filtered.length === 0) return;
+
+  const sorted = filtered.sort((a, b) => {
+    const timeA = a.conxMinutes !== null ? a.conxMinutes : Number.MAX_SAFE_INTEGER;
+    const timeB = b.conxMinutes !== null ? b.conxMinutes : Number.MAX_SAFE_INTEGER;
+    return (timeA - timeB) || a.dep.localeCompare(b.dep) || a.fltnr.localeCompare(b.fltnr);
+  });
+
+  const totalBags = sorted.reduce((sum, item) => sum + item.bags, 0);
+  const alertFlights = sorted.filter(item => item.conxSeverity);
+  const rowsHtml = buildFlightListRowsHtml(sorted, category === 'ALL');
+  const categoryHeader = category === 'ALL' ? '<th>ประเภท</th>' : '';
+
+  const html = `
+    <div class="modal-summary-strip">
+      <span class="modal-pill">หมวดหมู่: ${escapeHtml(categoryLabel)}</span>
+      <span class="modal-pill">รวมกระเป๋า: ${totalBags} ใบ</span>
+      <span class="modal-pill">จำนวนไฟลท์: ${sorted.length} ลำ</span>
+      <span class="modal-pill">ไฟลท์แจ้งเตือน: ${alertFlights.length} ลำ</span>
+    </div>
+    <div class="table-wrap" style="max-height:340px;">
+      <table>
+        <thead>
+          <tr>
+            <th>DEP</th>
+            <th>FLIGHT NO.</th>
+            <th>STA</th>
+            <th>ROUTE</th>
+            <th>CONX</th>
+            ${categoryHeader}
+            <th>แจ้งเตือน!</th>
+            <th class="num">BAGS TTL</th>
+          </tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    </div>
+  `;
+
+  openDetailModal(titleText, html, { clearStack: true });
+}
+
+function openFlightPopup(flightId, options = {}) {
   const f = currentParsedFlights.find(item => item.id === flightId);
   if (!f) return;
 
@@ -471,7 +622,7 @@ function openFlightPopup(flightId) {
     </div>
   `;
 
-  openDetailModal(`รายละเอียดไฟลท์ ${f.fltnr} (${f.dep})`, html);
+  openDetailModal(`รายละเอียดไฟลท์ ${f.fltnr} (${f.dep})`, html, options);
 }
 
 function openStationPopup(dep, isInter) {
@@ -496,7 +647,7 @@ function openStationPopup(dep, isInter) {
     }"` : '';
 
     return `
-      <tr ${rowAlert} onclick="openFlightPopup(${f.id})" style="cursor:pointer;">
+      <tr ${rowAlert} onclick="openFlightPopup(${f.id}, { pushCurrent: true })" style="cursor:pointer;">
         <td><strong>${escapeHtml(f.fltnr)}</strong></td>
         <td>${escapeHtml(f.sta)}</td>
         <td>${escapeHtml(f.route)}</td>
@@ -531,7 +682,7 @@ function openStationPopup(dep, isInter) {
     </div>
   `;
 
-  openDetailModal(`รายละเอียดสถานีต้นทาง ${dep} (${isInter ? 'INTER' : 'DOM'})`, html);
+  openDetailModal(`รายละเอียดสถานีต้นทาง ${dep} (${isInter ? 'INTER' : 'DOM'})`, html, { clearStack: true });
 }
 
 function clearAll() {

@@ -195,6 +195,14 @@
       border-radius: 10px;
       text-align: center;
       border: 1px solid var(--border);
+      cursor: pointer;
+      transition: transform 0.12s, box-shadow 0.12s, filter 0.12s;
+      width: 100%;
+    }
+    .stat-box:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+      filter: brightness(0.98);
     }
     .stat-box.inter { background: var(--inter-bg); border-color: #d8b4fe; }
     .stat-box.dom { background: var(--dom-bg); border-color: #bae6fd; }
@@ -248,12 +256,16 @@
     .station-code { font-weight: 800; font-size: 1rem; color: var(--text); }
     .station-meta { font-size: 0.75rem; color: var(--muted); }
     .station-alert-tag {
-      display: inline-block;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
       margin-top: 4px;
-      padding: 1px 6px;
+      padding: 2px 7px;
       border-radius: 99px;
       font-size: 0.68rem;
       font-weight: 700;
+      line-height: 1.2;
     }
     .station-bags { font-size: 1.15rem; font-weight: 800; color: var(--primary); }
     .station-bags.dom-val { color: var(--dom-text); }
@@ -294,11 +306,15 @@
     .num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
 
     .badge {
-      display: inline-block;
-      padding: 2px 7px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 3px 9px;
       border-radius: 99px;
       font-size: 0.72rem;
       font-weight: 700;
+      line-height: 1.2;
       white-space: nowrap;
     }
     .badge-inter { background: var(--inter-bg); color: var(--inter-text); }
@@ -309,7 +325,7 @@
     .badge-short-danger { background: var(--danger-bg); color: var(--danger-text); border: 1px solid var(--danger-border); }
     .badge-short-warn { background: var(--warn-bg); color: var(--warn-text); border: 1px solid var(--warn-border); }
     .badge-long-success { background: var(--success-bg); color: var(--success-text); border: 1px solid var(--success-border); }
-    .notice-line { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+    .notice-line { display: inline-flex; align-items: center; justify-content: center; gap: 5px; white-space: nowrap; }
     .notice-ok { color: #94a3b8; font-size: 0.78rem; }
 
     .note-box {
@@ -354,6 +370,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: 8px;
     }
     .modal-header h3 {
       margin: 0;
@@ -401,16 +418,24 @@
     .modal-summary-strip {
       display: flex;
       flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
       gap: 8px;
       margin-bottom: 14px;
       font-size: 0.84rem;
     }
     .modal-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
       background: #f3e8ff;
       color: var(--primary);
-      padding: 5px 10px;
+      padding: 5px 12px;
       border-radius: 99px;
       font-weight: 700;
+      line-height: 1.25;
     }
   </style>
 </head>
@@ -419,7 +444,7 @@
 <div class="container">
   <header>
     <div>
-      <h1>「Altea CM Inbound Connection DOM / INT Bag Calculator for CLC」 ✦Version 1.2.1✦</h1>
+      <h1>「Altea CM Inbound Connection DOM / INT Bag Calculator for CLC」 ✦Version 1.2.2✦</h1>
       <span>คำนวณยอดกระเป๋าต่อเครื่องเข้าเที่ยวบินหลัก · เรียงตามระยะเวลาต่อเครื่อง CONX (น้อย → มาก) · แจ้งเตือนตามเงื่อนไขเวลาต่อเครื่อง</span>
     </div>
   </header>
@@ -432,13 +457,13 @@
     <!-- Input & Search History -->
     <div>
       <div class="card">
-        <h2>1. วางข้อมูลจาก Altea CM (Ctrl+V)</h2>
+        <h2>1. วางข้อมูลจาก Altea CM<br>ในหัวข้อ Copy Cryptic Output to Clipboard (Ctrl+V) ในกรอบด้านล่าง</h2>
         <textarea id="rawInput" placeholder="Copy ข้อความตั้งแต่ INBOUND CUSTOMER SUMMARY ลงมาวางที่นี่..."></textarea>
         <div class="note-box">
           <b>เงื่อนไขการนับและแจ้งเตือน:</b><br>
           • ดูจาก <b>Inbound ขาเข้า (DEP)</b> เป็นหลัก: สนามบินในไทย = <b>DOM</b> / ต่างประเทศ = <b>INTER</b><br>
           • เลขไฟลท์ตัดเลข 0 นำหน้าออกอัตโนมัติ (ไม่ขึ้นต้นด้วย 0) และรองรับไฟลท์มีตัวอักษรต่อท้าย เช่น <code>TG925D</code><br>
-          • คลิกที่กล่องสถานี <b>DEP</b> หรือแถวไฟลท์เพื่อดูรายละเอียดแบบ Popup
+          • คลิกที่กล่องสรุปยอด, กล่องสถานี <b>DEP</b> หรือแถวไฟลท์เพื่อดูรายละเอียดแบบ Popup
         </div>
         <div class="controls">
           <button class="btn-clear" onclick="clearAll()">ล้างข้อมูล</button>
@@ -463,21 +488,21 @@
         <div id="flightBanner" class="flight-banner"></div>
 
         <div class="summary-boxes">
-          <div class="stat-box inter">
+          <button type="button" class="stat-box inter" onclick="openCategoryPopup('INTER')">
             <div class="stat-label">INTER BAGS</div>
             <div class="stat-value" id="interTotal">0</div>
             <div class="stat-sub" id="interFlights">0 ไฟลท์</div>
-          </div>
-          <div class="stat-box dom">
+          </button>
+          <button type="button" class="stat-box dom" onclick="openCategoryPopup('DOM')">
             <div class="stat-label">DOM BAGS</div>
             <div class="stat-value" id="domTotal">0</div>
             <div class="stat-sub" id="domFlights">0 ไฟลท์</div>
-          </div>
-          <div class="stat-box total">
+          </button>
+          <button type="button" class="stat-box total" onclick="openCategoryPopup('ALL')">
             <div class="stat-label">รวมทั้งหมด</div>
             <div class="stat-value" id="grandTotal">0</div>
             <div class="stat-sub" id="totalFlights">0 ไฟลท์</div>
-          </div>
+          </button>
         </div>
 
         <h2 style="font-size:0.98rem; margin-bottom:8px;">แยกตามสถานีต้นทาง (DEP)</h2>
