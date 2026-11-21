@@ -113,14 +113,71 @@
     .btn-clear:hover { background: #cbd5e1; }
     .btn-copy { background: var(--primary); color: white; }
     .btn-copy:hover { background: var(--primary-light); }
-    .btn-toggle {
+    .btn-mini-clear {
       padding: 4px 10px;
-      font-size: 0.78rem;
-      background: #f3e8ff;
-      color: var(--primary);
-      border: 1px solid #d8b4fe;
+      font-size: 0.76rem;
+      background: #fee2e2;
+      color: #b91c1c;
+      border: 1px solid #fca5a5;
     }
-    .btn-toggle:hover { background: #e9d5ff; }
+    .btn-mini-clear:hover { background: #fecaca; }
+
+    .history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 240px;
+      overflow-y: auto;
+    }
+    .history-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fafafa;
+      transition: 0.15s;
+    }
+    .history-item:hover {
+      background: #f3e8ff;
+      border-color: #d8b4fe;
+    }
+    .history-select {
+      flex: 1;
+      text-align: left;
+      background: transparent;
+      padding: 0;
+      color: var(--text);
+      font-weight: 600;
+    }
+    .history-title {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--primary);
+    }
+    .history-meta {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .history-del {
+      background: transparent;
+      color: #94a3b8;
+      padding: 4px 7px;
+      font-size: 0.82rem;
+      border-radius: 4px;
+    }
+    .history-del:hover {
+      background: #fee2e2;
+      color: #b91c1c;
+    }
+    .history-empty {
+      font-size: 0.82rem;
+      color: var(--muted);
+      padding: 6px 0;
+    }
 
     .flight-banner {
       background: #f3e8ff;
@@ -229,23 +286,6 @@
       border: 1px dashed #cbd5e1;
       line-height: 1.45;
     }
-
-    .patch-list {
-      margin: 0;
-      padding-left: 18px;
-      font-size: 0.82rem;
-      color: var(--text);
-      line-height: 1.55;
-      max-height: 220px;
-      overflow-y: auto;
-    }
-    .patch-list.hidden { display: none; }
-    .patch-empty {
-      font-size: 0.82rem;
-      color: var(--muted);
-      padding: 4px 0;
-    }
-    .patch-empty.hidden { display: none; }
   </style>
 </head>
 <body>
@@ -253,7 +293,7 @@
 <div class="container">
   <header>
     <div>
-      <h1>「Altea CM Inbound Connection Bag Calculator for CLC」 ✦Version 1.0.0✦</h1>
+      <h1>「Altea CM Inbound Connection Bag Calculator for CLC」 ✦Version 1.1.0✦</h1>
       <span>คำนวณยอดกระเป๋าต่อเครื่องเข้าเที่ยวบินหลัก · เรียงตามระยะเวลาต่อเครื่อง CONX (น้อย → มาก) · แจ้งเตือนตามเงื่อนไขเวลาต่อเครื่อง</span>
     </div>
   </header>
@@ -263,7 +303,7 @@
   </div>
 
   <div class="grid">
-    <!-- Input & Patch Logs -->
+    <!-- Input & Search History -->
     <div>
       <div class="card">
         <h2>1. วางข้อมูลจาก Altea CM (Ctrl+V)</h2>
@@ -280,12 +320,13 @@
       </div>
 
       <div class="card">
-        <h2 style="margin-bottom:0;">
-          <span>Patch Logs</span>
-          <button type="button" id="togglePatchBtn" class="btn-toggle" onclick="togglePatchLogs()">แสดง</button>
+        <h2>
+          <span>Search History</span>
+          <button type="button" class="btn-mini-clear" onclick="clearSearchHistory()">ล้างประวัติ</button>
         </h2>
-        <div id="patchEmpty" class="patch-empty hidden" style="margin-top:12px;">ยังไม่มีรายการบันทึกการแก้ไขสำหรับเวอร์ชั่นนี้</div>
-        <ul id="patchList" class="patch-list hidden" style="margin-top:12px;"></ul>
+        <div id="historyList" class="history-list">
+          <div class="history-empty">ยังไม่มีประวัติไฟลท์ที่คำนวณ</div>
+        </div>
       </div>
     </div>
 
@@ -348,17 +389,116 @@
 </div>
 
 <script>
-  const rawInput = document.getElementById('rawInput');
-  rawInput.addEventListener('input', parseAlteaData);
+  const HISTORY_STORAGE_KEY = 'altea_clc_search_history_v1';
+  const MAX_HISTORY_ITEMS = 30;
+  let saveHistoryTimer = null;
 
-  function togglePatchLogs() {
-    const patchList = document.getElementById('patchList');
-    const patchEmpty = document.getElementById('patchEmpty');
-    const btn = document.getElementById('togglePatchBtn');
-    const hasItems = patchList.children.length > 0;
-    const targetEl = hasItems ? patchList : patchEmpty;
-    const isHidden = targetEl.classList.toggle('hidden');
-    btn.textContent = isHidden ? 'แสดง' : 'ซ่อน';
+  const rawInput = document.getElementById('rawInput');
+  rawInput.addEventListener('input', () => {
+    parseAlteaData();
+    clearTimeout(saveHistoryTimer);
+    saveHistoryTimer = setTimeout(recordCurrentFlightToHistory, 400);
+  });
+
+  function loadHistory() {
+    try {
+      const raw = localStorage.getItem(HISTORY_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveHistory(items) {
+    try {
+      localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(items));
+    } catch (e) {
+      // ignore storage quota error
+    }
+  }
+
+  function formatTimeNow() {
+    const now = new Date();
+    return now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function recordCurrentFlightToHistory() {
+    const text = rawInput.value.trim();
+    if (!text) return;
+
+    const bannerText = document.getElementById('flightBanner').textContent.trim();
+    const headerMatch = bannerText.match(/กระเป๋าต่อเครื่องเข้าเที่ยวบิน:\s*(.+)$/);
+    const flightLabel = headerMatch ? headerMatch[1].trim() : '';
+    const totalFlights = parseInt(document.getElementById('totalFlights').textContent, 10) || 0;
+
+    if (!flightLabel && totalFlights === 0) return;
+
+    const label = flightLabel || `รายการ (${totalFlights} ไฟลท์)`;
+    const inter = document.getElementById('interTotal').textContent;
+    const dom = document.getElementById('domTotal').textContent;
+    const total = document.getElementById('grandTotal').textContent;
+
+    const history = loadHistory().filter(item => item.label !== label);
+    history.unshift({
+      id: Date.now(),
+      label,
+      inter,
+      dom,
+      total,
+      time: formatTimeNow(),
+      rawText: rawInput.value
+    });
+
+    saveHistory(history.slice(0, MAX_HISTORY_ITEMS));
+    renderSearchHistory();
+  }
+
+  function renderSearchHistory() {
+    const container = document.getElementById('historyList');
+    const history = loadHistory();
+
+    if (history.length === 0) {
+      container.innerHTML = '<div class="history-empty">ยังไม่มีประวัติไฟลท์ที่คำนวณ</div>';
+      return;
+    }
+
+    container.innerHTML = history.map(item => `
+      <div class="history-item">
+        <button type="button" class="history-select" onclick="selectHistoryItem(${item.id})">
+          <div class="history-title">${escapeHtml(item.label)}</div>
+          <div class="history-meta">INTER: ${item.inter} · DOM: ${item.dom} · TOTAL: ${item.total} (${item.time})</div>
+        </button>
+        <button type="button" class="history-del" title="ลบรายการนี้" onclick="deleteHistoryItem(${item.id})">✕</button>
+      </div>
+    `).join('');
+  }
+
+  function selectHistoryItem(id) {
+    const history = loadHistory();
+    const target = history.find(item => item.id === id);
+    if (!target) return;
+    rawInput.value = target.rawText;
+    parseAlteaData();
+  }
+
+  function deleteHistoryItem(id) {
+    const updated = loadHistory().filter(item => item.id !== id);
+    saveHistory(updated);
+    renderSearchHistory();
+  }
+
+  function clearSearchHistory() {
+    saveHistory([]);
+    renderSearchHistory();
+  }
+
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
   }
 
   const TH_DOMESTIC_AIRPORTS = new Set([
@@ -633,6 +773,8 @@
       alert('คัดลอกสรุปยอดเรียบร้อยแล้ว:\n\n' + summaryText);
     });
   }
+
+  renderSearchHistory();
 </script>
 
 </body>
