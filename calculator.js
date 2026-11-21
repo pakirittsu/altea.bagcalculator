@@ -61,6 +61,7 @@ function renderModalBackButton() {
     backBtn.style.display = 'none';
   }
 }
+
 function openDetailModal(title, htmlContent, options = {}) {
   const { pushCurrent = false, clearStack = false } = options;
 
