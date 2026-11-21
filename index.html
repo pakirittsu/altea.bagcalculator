@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Altea Inbound Connection Bag Calculator</title>
+  <title>Altea CM Inbound Connection Bag Calculator for CLC</title>
   <style>
     :root {
       --primary: #4a148c;
@@ -25,6 +25,14 @@
       --danger-text: #b91c1c;
       --danger-border: #fca5a5;
       --danger-row: #fff5f5;
+      --missed-conx-bg: #7f1d1d;
+      --missed-conx-text: #ffffff;
+      --missed-conx-border: #450a0a;
+      --missed-conx-row: #fecaca;
+      --success-bg: #dcfce7;
+      --success-text: #15803d;
+      --success-border: #86efac;
+      --success-row: #f0fdf4;
     }
 
     * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
@@ -36,11 +44,24 @@
       color: white;
       padding: 18px 24px;
       border-radius: 12px;
-      margin-bottom: 20px;
+      margin-bottom: 14px;
       box-shadow: 0 4px 12px rgba(74, 20, 140, 0.15);
     }
     header h1 { margin: 0; font-size: 1.35rem; }
     header span { font-size: 0.88rem; opacity: 0.92; }
+
+    .top-feedback-banner {
+      background: #ffffff;
+      border: 1px solid #e9d5ff;
+      border-left: 4px solid var(--primary);
+      color: #3b0764;
+      padding: 10px 16px;
+      border-radius: 10px;
+      font-size: 0.88rem;
+      font-weight: 500;
+      margin-bottom: 18px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+    }
 
     .grid { display: grid; grid-template-columns: 1fr 1.55fr; gap: 20px; align-items: start; }
     @media (max-width: 960px) { .grid { grid-template-columns: 1fr; } }
@@ -66,7 +87,7 @@
 
     textarea {
       width: 100%;
-      height: 410px;
+      height: 360px;
       padding: 12px;
       border: 1.5px solid #cbd5e1;
       border-radius: 8px;
@@ -92,6 +113,14 @@
     .btn-clear:hover { background: #cbd5e1; }
     .btn-copy { background: var(--primary); color: white; }
     .btn-copy:hover { background: var(--primary-light); }
+    .btn-toggle {
+      padding: 4px 10px;
+      font-size: 0.78rem;
+      background: #f3e8ff;
+      color: var(--primary);
+      border: 1px solid #d8b4fe;
+    }
+    .btn-toggle:hover { background: #e9d5ff; }
 
     .flight-banner {
       background: #f3e8ff;
@@ -161,10 +190,14 @@
       white-space: nowrap;
     }
     tr:hover { background: #f8fafc; }
+    tr.missed-conx-row { background: var(--missed-conx-row); }
+    tr.missed-conx-row:hover { background: #fca5a5; }
     tr.short-danger-row { background: var(--danger-row); }
     tr.short-danger-row:hover { background: #fee2e2; }
     tr.short-warn-row { background: var(--warn-row); }
     tr.short-warn-row:hover { background: #fef3c7; }
+    tr.long-conn-row { background: var(--success-row); }
+    tr.long-conn-row:hover { background: #dcfce7; }
     .num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
 
     .badge {
@@ -177,10 +210,12 @@
     }
     .badge-inter { background: var(--inter-bg); color: var(--inter-text); }
     .badge-dom { background: var(--dom-bg); color: var(--dom-text); }
+    .badge-missed-conx { background: var(--missed-conx-bg); color: var(--missed-conx-text); border: 1px solid var(--missed-conx-border); }
     .badge-miss-danger { background: var(--danger-bg); color: var(--danger-text); border: 1px solid var(--danger-border); }
     .badge-miss-warn { background: var(--warn-bg); color: var(--warn-text); border: 1px solid var(--warn-border); }
     .badge-short-danger { background: var(--danger-bg); color: var(--danger-text); border: 1px solid var(--danger-border); }
     .badge-short-warn { background: var(--warn-bg); color: var(--warn-text); border: 1px solid var(--warn-border); }
+    .badge-long-success { background: var(--success-bg); color: var(--success-text); border: 1px solid var(--success-border); }
     .notice-line { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
     .notice-ok { color: #94a3b8; font-size: 0.78rem; }
 
@@ -194,6 +229,23 @@
       border: 1px dashed #cbd5e1;
       line-height: 1.45;
     }
+
+    .patch-list {
+      margin: 0;
+      padding-left: 18px;
+      font-size: 0.82rem;
+      color: var(--text);
+      line-height: 1.55;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+    .patch-list.hidden { display: none; }
+    .patch-empty {
+      font-size: 0.82rem;
+      color: var(--muted);
+      padding: 4px 0;
+    }
+    .patch-empty.hidden { display: none; }
   </style>
 </head>
 <body>
@@ -201,25 +253,39 @@
 <div class="container">
   <header>
     <div>
-      <h1>Altea Inbound Connection Bag Calculator Version 1.0.9 By แมวมอง</h1>
-      <span>คำนวณยอดกระเป๋าต่อเครื่องเข้าเที่ยวบินหลัก · แยกตามต้นทาง DEP · แจ้งเตือน Short Connection (&lt; 30m แดง / 30–60m เหลือง)</span>
+      <h1>「Altea CM Inbound Connection Bag Calculator for CLC」 ✦Version 1.0.0✦</h1>
+      <span>คำนวณยอดกระเป๋าต่อเครื่องเข้าเที่ยวบินหลัก · เรียงตามระยะเวลาต่อเครื่อง CONX (น้อย → มาก) · แจ้งเตือนตามเงื่อนไขเวลาต่อเครื่อง</span>
     </div>
   </header>
 
+  <div class="top-feedback-banner">
+    หากใช้แล้วพบเจอปัญหาบั๊ค หรือยอดไม่ตรง รบกวนส่ง Feedback ให้กับพี่ทีม หรีอน้องฟรุต เพื่อปรับปรุงให้ดียิ่งขึ้น ขอบคุณครับ
+  </div>
+
   <div class="grid">
-    <!-- Input -->
-    <div class="card">
-      <h2>1. วางข้อมูลจาก Altea (Ctrl+V)</h2>
-      <textarea id="rawInput" placeholder="Copy ข้อความตั้งแต่ INBOUND CUSTOMER SUMMARY ลงมาวางที่นี่..."></textarea>
-      <div class="note-box">
-        <b>เงื่อนไขการนับและแจ้งเตือน:</b><br>
-        • ดูจาก <b>Inbound ขาเข้า (DEP)</b> เป็นหลัก: สนามบินในไทย = <b>DOM</b> / ต่างประเทศ = <b>INTER</b><br>
-        • เลขไฟลท์ตัดเลข 0 นำหน้าออกอัตโนมัติ (ไม่ขึ้นต้นด้วย 0)<br>
-        • <b>CONX &lt; 30 นาที:</b> สีแดง | <b>CONX 30–60 นาที:</b> สีเหลือง
+    <!-- Input & Patch Logs -->
+    <div>
+      <div class="card">
+        <h2>1. วางข้อมูลจาก Altea CM (Ctrl+V)</h2>
+        <textarea id="rawInput" placeholder="Copy ข้อความตั้งแต่ INBOUND CUSTOMER SUMMARY ลงมาวางที่นี่..."></textarea>
+        <div class="note-box">
+          <b>เงื่อนไขการนับและแจ้งเตือน:</b><br>
+          • ดูจาก <b>Inbound ขาเข้า (DEP)</b> เป็นหลัก: สนามบินในไทย = <b>DOM</b> / ต่างประเทศ = <b>INTER</b><br>
+          • เลขไฟลท์ตัดเลข 0 นำหน้าออกอัตโนมัติ (ไม่ขึ้นต้นด้วย 0) และรองรับไฟลท์มีตัวอักษรต่อท้าย เช่น <code>TG925D</code>
+        </div>
+        <div class="controls">
+          <button class="btn-clear" onclick="clearAll()">ล้างข้อมูล</button>
+          <button class="btn-copy" onclick="copySummary()">คัดลอกสรุปยอด</button>
+        </div>
       </div>
-      <div class="controls">
-        <button class="btn-clear" onclick="clearAll()">ล้างข้อมูล</button>
-        <button class="btn-copy" onclick="copySummary()">คัดลอกสรุปยอด</button>
+
+      <div class="card">
+        <h2 style="margin-bottom:0;">
+          <span>Patch Logs</span>
+          <button type="button" id="togglePatchBtn" class="btn-toggle" onclick="togglePatchLogs()">แสดง</button>
+        </h2>
+        <div id="patchEmpty" class="patch-empty hidden" style="margin-top:12px;">ยังไม่มีรายการบันทึกการแก้ไขสำหรับเวอร์ชั่นนี้</div>
+        <ul id="patchList" class="patch-list hidden" style="margin-top:12px;"></ul>
       </div>
     </div>
 
@@ -254,7 +320,7 @@
       </div>
 
       <div class="card">
-        <h2>3. รายการตรวจสอบรายไฟลท์ (เรียงตามสถานีต้นทาง)</h2>
+        <h2>3. รายการตรวจสอบรายไฟลท์ (เรียงตามระยะเวลาต่อเครื่อง CONX น้อย → มาก)</h2>
         <div class="table-wrap">
           <table>
             <thead>
@@ -285,6 +351,16 @@
   const rawInput = document.getElementById('rawInput');
   rawInput.addEventListener('input', parseAlteaData);
 
+  function togglePatchLogs() {
+    const patchList = document.getElementById('patchList');
+    const patchEmpty = document.getElementById('patchEmpty');
+    const btn = document.getElementById('togglePatchBtn');
+    const hasItems = patchList.children.length > 0;
+    const targetEl = hasItems ? patchList : patchEmpty;
+    const isHidden = targetEl.classList.toggle('hidden');
+    btn.textContent = isHidden ? 'แสดง' : 'ซ่อน';
+  }
+
   const TH_DOMESTIC_AIRPORTS = new Set([
     'BKK', 'DMK', 'CNX', 'CEI', 'HKT', 'KBV', 'USM', 'TDX', 'THS',
     'UTH', 'UBP', 'KKC', 'NST', 'HDY', 'TST', 'LPT', 'PHS', 'TAW',
@@ -294,12 +370,12 @@
 
   function normalizeFlightNumber(rawFltnr) {
     const clean = rawFltnr.trim().toUpperCase();
-    const match = clean.match(/^([A-Z0-9]{2})0*(\d+)([A-Z]?)$/);
+    const match = clean.match(/^([A-Z0-9]{2})0*(\d+)([A-Z]{1,2})$/);
     if (match) {
       const digits = match[2] || '0';
       return `${match[1]}${digits}${match[3]}`;
     }
-    const numOnly = clean.match(/^0*(\d+)([A-Z]?)$/);
+    const numOnly = clean.match(/^0*(\d+)([A-Z]{1,2})$/);
     if (numOnly) {
       return `${numOnly[1] || '0'}${numOnly[2]}`;
     }
@@ -307,15 +383,18 @@
   }
 
   function parseConxMinutes(conxStr) {
-    const m = (conxStr || '').trim().toUpperCase().match(/^(\d{2})H(\d{2})$/);
+    const m = (conxStr || '').trim().toUpperCase().match(/^(-?)(\d{2})H(\d{2})$/);
     if (!m) return null;
-    return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+    const sign = m[1] === '-' ? -1 : 1;
+    return sign * (parseInt(m[2], 10) * 60 + parseInt(m[3], 10));
   }
 
   function getConxSeverity(conxMinutes) {
     if (conxMinutes === null) return null;
+    if (conxMinutes < 0) return 'missed_conx';
     if (conxMinutes < 30) return 'danger';
     if (conxMinutes <= 60) return 'warn';
+    if (conxMinutes > 360) return 'long';
     return null;
   }
 
@@ -325,7 +404,7 @@
       return false;
     }
 
-    const match = fltnr.match(/^([A-Z0-9]{2})(\d+)([A-Z]?)$/);
+    const match = fltnr.match(/^([A-Z0-9]{2})(\d+)([A-Z]{1,2})$/);
     if (!match) return true;
 
     const airline = match[1];
@@ -346,13 +425,13 @@
     let headerInfo = '';
     const flights = [];
 
-    const flightRegex = /^\s*([A-Z0-9]{2}\d{1,4}[A-Z]?)\s+([AE]?\d{4})\s+([A-Z]{3})\s+([A-Z]{3})\s+(\d{2}H\d{2})\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*$/i;
+    const flightRegex = /^\s*([A-Z0-9]{2}\d{1,4}[A-Z]{0,2})\s+([AE]?\d{4})\s+([A-Z]{3})\s+([A-Z]{3})\s+(-?\d{2}H\d{2})\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*$/i;
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
       if (!line) continue;
 
-      if (/^TG\d+\s+\d{2}[A-Z]{3}\s+[A-Z]{3}/i.test(line)) {
+      if (/^TG\d+[A-Z]{0,2}\s+\d{2}[A-Z]{3}\s+[A-Z]{3}/i.test(line)) {
         headerInfo = line;
       }
 
@@ -458,31 +537,39 @@
       return;
     }
 
-    const sortedFlights = [...flights].sort((a, b) =>
-      a.dep.localeCompare(b.dep) || a.fltnr.localeCompare(b.fltnr)
-    );
+    const sortedFlights = [...flights].sort((a, b) => {
+      const timeA = a.conxMinutes !== null ? a.conxMinutes : Number.MAX_SAFE_INTEGER;
+      const timeB = b.conxMinutes !== null ? b.conxMinutes : Number.MAX_SAFE_INTEGER;
+      return (timeA - timeB) || a.dep.localeCompare(b.dep) || a.fltnr.localeCompare(b.fltnr);
+    });
 
     sortedFlights.forEach(f => {
       const notices = [];
-      const alertLevel = f.conxSeverity || (f.isMissed ? 'warn' : null);
+      const rowAlert = f.conxSeverity;
 
-      if (f.conxSeverity) {
-        const shortClass = f.conxSeverity === 'danger' ? 'badge-short-danger' : 'badge-short-warn';
-        notices.push(`<span class="badge ${shortClass}">SHORT CONX (${f.conxMinutes}m)</span>`);
+      if (f.conxSeverity === 'missed_conx') {
+        notices.push(`<span class="badge badge-missed-conx">MISSED CONX (${f.conxMinutes}m)</span>`);
+      } else if (f.conxSeverity === 'danger') {
+        notices.push(`<span class="badge badge-short-danger">SHORT CONX (${f.conxMinutes}m)</span>`);
+      } else if (f.conxSeverity === 'warn') {
+        notices.push(`<span class="badge badge-short-warn">SHORT CONX (${f.conxMinutes}m)</span>`);
+      } else if (f.conxSeverity === 'long') {
+        notices.push(`<span class="badge badge-long-success">ระยะเวลาต่อเครื่องมากกว่า 6 ชั่วโมง</span>`);
       }
-      if (f.isMissed) {
-        const missClass = alertLevel === 'danger' ? 'badge-miss-danger' : 'badge-miss-warn';
-        notices.push(`<span class="badge ${missClass}">อาจจะไม่ทัน!</span>`);
-      }
+
       const noticeHtml = notices.length
         ? `<div class="notice-line">${notices.join('')}</div>`
         : `<span class="notice-ok">-</span>`;
 
       const tr = document.createElement('tr');
-      if (alertLevel === 'danger') {
+      if (rowAlert === 'missed_conx') {
+        tr.classList.add('missed-conx-row');
+      } else if (rowAlert === 'danger') {
         tr.classList.add('short-danger-row');
-      } else if (alertLevel === 'warn') {
+      } else if (rowAlert === 'warn') {
         tr.classList.add('short-warn-row');
+      } else if (rowAlert === 'long') {
+        tr.classList.add('long-conn-row');
       }
 
       tr.innerHTML = `
@@ -516,17 +603,29 @@
       return `${code}:${bags}`;
     });
 
+    const missedRows = Array.from(document.querySelectorAll('#resultBody tr.missed-conx-row')).map(tr => {
+      const cells = tr.querySelectorAll('td');
+      return `${cells[1].textContent.trim()} (${cells[0].textContent.trim()} ${cells[4].textContent.trim()}, ${cells[7].textContent.trim()} bags)`;
+    });
+
     const shortRows = Array.from(document.querySelectorAll('#resultBody tr.short-danger-row, #resultBody tr.short-warn-row')).map(tr => {
       const cells = tr.querySelectorAll('td');
       const level = tr.classList.contains('short-danger-row') ? '<30m' : '30-60m';
       return `${cells[1].textContent.trim()} (${cells[0].textContent.trim()} ${cells[4].textContent.trim()} [${level}], ${cells[7].textContent.trim()} bags)`;
     });
 
+    const longRows = Array.from(document.querySelectorAll('#resultBody tr.long-conn-row')).map(tr => {
+      const cells = tr.querySelectorAll('td');
+      return `${cells[1].textContent.trim()} (${cells[0].textContent.trim()} ${cells[4].textContent.trim()}, ${cells[7].textContent.trim()} bags)`;
+    });
+
     const lines = [
       banner,
       `INTER BAGS: ${inter} | DOM BAGS: ${dom} | TOTAL: ${total}`,
       stations.length ? `BY DEP: ${stations.join(', ')}` : '',
-      shortRows.length ? `SHORT CONX (<=1H): ${shortRows.join(', ')}` : ''
+      missedRows.length ? `MISSED CONX: ${missedRows.join(', ')}` : '',
+      shortRows.length ? `SHORT CONX (<=1H): ${shortRows.join(', ')}` : '',
+      longRows.length ? `LONG CONX (>6H): ${longRows.join(', ')}` : ''
     ].filter(Boolean);
 
     const summaryText = lines.join('\n');
