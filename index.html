@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Altea Inbound Connection Bag Calculator</title>
+  <style>
+    :root {
+      --primary: #4a148c;
+      --primary-light: #7c43bd;
+      --bg: #f4f6f9;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #64748b;
+      --border: #e5e7eb;
+      --inter-bg: #f3e5f5;
+      --inter-text: #4a148c;
+      --dom-bg: #e0f2fe;
+      --dom-text: #0369a1;
+      --warn-bg: #fef3c7;
+      --warn-text: #b45309;
+      --warn-border: #fcd34d;
+      --warn-row: #fffbeb;
+      --danger-bg: #fee2e2;
+      --danger-text: #b91c1c;
+      --danger-border: #fca5a5;
+      --danger-row: #fff5f5;
+    }
+
+    * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { margin: 0; padding: 20px; background: var(--bg); color: var(--text); }
+    .container { max-width: 1280px; margin: 0 auto; }
+
+    header {
+      background: linear-gradient(135deg, var(--primary), var(--primary-light));
+      color: white;
+      padding: 18px 24px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 12px rgba(74, 20, 140, 0.15);
+    }
+    header h1 { margin: 0; font-size: 1.35rem; }
+    header span { font-size: 0.88rem; opacity: 0.92; }
+
+    .grid { display: grid; grid-template-columns: 1fr 1.55fr; gap: 20px; align-items: start; }
+    @media (max-width: 960px) { .grid { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      border: 1px solid var(--border);
+      margin-bottom: 16px;
+    }
+
+    .card h2 {
+      margin-top: 0;
+      font-size: 1.05rem;
+      color: var(--primary);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    textarea {
+      width: 100%;
+      height: 410px;
+      padding: 12px;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 8px;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 0.84rem;
+      line-height: 1.4;
+      resize: vertical;
+      background: #fafafa;
+    }
+    textarea:focus { outline: none; border-color: var(--primary); background: #fff; }
+
+    .controls { margin-top: 12px; display: flex; gap: 8px; justify-content: flex-end; }
+    button {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: 0.15s;
+    }
+    .btn-clear { background: #e2e8f0; color: #334155; }
+    .btn-clear:hover { background: #cbd5e1; }
+    .btn-copy { background: var(--primary); color: white; }
+    .btn-copy:hover { background: var(--primary-light); }
+
+    .flight-banner {
+      background: #f3e8ff;
+      border-left: 4px solid var(--primary);
+      padding: 10px 14px;
+      border-radius: 6px;
+      margin-bottom: 14px;
+      font-weight: 600;
+      font-size: 0.92rem;
+      color: #3b0764;
+      display: none;
+    }
+
+    .summary-boxes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+    .stat-box {
+      padding: 14px;
+      border-radius: 10px;
+      text-align: center;
+      border: 1px solid var(--border);
+    }
+    .stat-box.inter { background: var(--inter-bg); border-color: #d8b4fe; }
+    .stat-box.dom { background: var(--dom-bg); border-color: #bae6fd; }
+    .stat-box.total { background: #f8fafc; }
+    .stat-label { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; color: #475569; }
+    .stat-value { font-size: 2rem; font-weight: 800; margin: 4px 0; }
+    .stat-box.inter .stat-value { color: var(--inter-text); }
+    .stat-box.dom .stat-value { color: var(--dom-text); }
+    .stat-sub { font-size: 0.78rem; color: var(--muted); }
+
+    .station-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .station-item {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: #fafafa;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .station-code { font-weight: 800; font-size: 1rem; color: var(--text); }
+    .station-meta { font-size: 0.75rem; color: var(--muted); }
+    .station-bags { font-size: 1.15rem; font-weight: 800; color: var(--primary); }
+    .station-bags.dom-val { color: var(--dom-text); }
+
+    .table-wrap { max-height: 380px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th {
+      background: #f8fafc;
+      position: sticky;
+      top: 0;
+      padding: 9px 8px;
+      text-align: left;
+      border-bottom: 2px solid var(--border);
+      color: #475569;
+      z-index: 1;
+      white-space: nowrap;
+    }
+    td {
+      padding: 7px 8px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+    tr:hover { background: #f8fafc; }
+    tr.short-danger-row { background: var(--danger-row); }
+    tr.short-danger-row:hover { background: #fee2e2; }
+    tr.short-warn-row { background: var(--warn-row); }
+    tr.short-warn-row:hover { background: #fef3c7; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 99px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .badge-inter { background: var(--inter-bg); color: var(--inter-text); }
+    .badge-dom { background: var(--dom-bg); color: var(--dom-text); }
+    .badge-miss-danger { background: var(--danger-bg); color: var(--danger-text); border: 1px solid var(--danger-border); }
+    .badge-miss-warn { background: var(--warn-bg); color: var(--warn-text); border: 1px solid var(--warn-border); }
+    .badge-short-danger { background: var(--danger-bg); color: var(--danger-text); border: 1px solid var(--danger-border); }
+    .badge-short-warn { background: var(--warn-bg); color: var(--warn-text); border: 1px solid var(--warn-border); }
+    .notice-line { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+    .notice-ok { color: #94a3b8; font-size: 0.78rem; }
+
+    .note-box {
+      margin-top: 10px;
+      font-size: 0.78rem;
+      color: var(--muted);
+      background: #f8fafc;
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: 1px dashed #cbd5e1;
+      line-height: 1.45;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div>
+      <h1>Altea Inbound Connection Bag Calculator Version 1.0.9 By แมวมอง</h1>
+      <span>คำนวณยอดกระเป๋าต่อเครื่องเข้าเที่ยวบินหลัก · แยกตามต้นทาง DEP · แจ้งเตือน Short Connection (&lt; 30m แดง / 30–60m เหลือง)</span>
+    </div>
+  </header>
+
+  <div class="grid">
+    <!-- Input -->
+    <div class="card">
+      <h2>1. วางข้อมูลจาก Altea (Ctrl+V)</h2>
+      <textarea id="rawInput" placeholder="Copy ข้อความตั้งแต่ INBOUND CUSTOMER SUMMARY ลงมาวางที่นี่..."></textarea>
+      <div class="note-box">
+        <b>เงื่อนไขการนับและแจ้งเตือน:</b><br>
+        • ดูจาก <b>Inbound ขาเข้า (DEP)</b> เป็นหลัก: สนามบินในไทย = <b>DOM</b> / ต่างประเทศ = <b>INTER</b><br>
+        • เลขไฟลท์ตัดเลข 0 นำหน้าออกอัตโนมัติ (ไม่ขึ้นต้นด้วย 0)<br>
+        • <b>CONX &lt; 30 นาที:</b> สีแดง | <b>CONX 30–60 นาที:</b> สีเหลือง
+      </div>
+      <div class="controls">
+        <button class="btn-clear" onclick="clearAll()">ล้างข้อมูล</button>
+        <button class="btn-copy" onclick="copySummary()">คัดลอกสรุปยอด</button>
+      </div>
+    </div>
+
+    <!-- Output -->
+    <div>
+      <div class="card">
+        <h2>2. สรุปยอดกระเป๋าต่อเครื่อง</h2>
+        <div id="flightBanner" class="flight-banner"></div>
+
+        <div class="summary-boxes">
+          <div class="stat-box inter">
+            <div class="stat-label">INTER BAGS</div>
+            <div class="stat-value" id="interTotal">0</div>
+            <div class="stat-sub" id="interFlights">0 ไฟลท์</div>
+          </div>
+          <div class="stat-box dom">
+            <div class="stat-label">DOM BAGS</div>
+            <div class="stat-value" id="domTotal">0</div>
+            <div class="stat-sub" id="domFlights">0 ไฟลท์</div>
+          </div>
+          <div class="stat-box total">
+            <div class="stat-label">รวมทั้งหมด</div>
+            <div class="stat-value" id="grandTotal">0</div>
+            <div class="stat-sub" id="totalFlights">0 ไฟลท์</div>
+          </div>
+        </div>
+
+        <h2 style="font-size:0.98rem; margin-bottom:8px;">แยกตามสถานีต้นทาง (DEP)</h2>
+        <div id="stationBreakdown" class="station-grid">
+          <div style="color:#94a3b8; font-size:0.86rem;">ยังไม่มีข้อมูล</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>3. รายการตรวจสอบรายไฟลท์ (เรียงตามสถานีต้นทาง)</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>DEP</th>
+                <th>FLIGHT NO.</th>
+                <th>STA</th>
+                <th>ROUTE</th>
+                <th>CONX</th>
+                <th>ประเภท</th>
+                <th>แจ้งเตือน!</th>
+                <th class="num">BAGS TTL</th>
+              </tr>
+            </thead>
+            <tbody id="resultBody">
+              <tr>
+                <td colspan="8" style="text-align:center; color:#94a3b8; padding: 26px;">ยังไม่มีข้อมูล — กรุณาวางข้อความในช่องด้านซ้าย</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const rawInput = document.getElementById('rawInput');
+  rawInput.addEventListener('input', parseAlteaData);
+
+  const TH_DOMESTIC_AIRPORTS = new Set([
+    'BKK', 'DMK', 'CNX', 'CEI', 'HKT', 'KBV', 'USM', 'TDX', 'THS',
+    'UTH', 'UBP', 'KKC', 'NST', 'HDY', 'TST', 'LPT', 'PHS', 'TAW',
+    'MAQ', 'PRH', 'NNT', 'ROI', 'BFV', 'SNO', 'NAW', 'CNQ', 'KOP', 'PXM',
+    'HGN', 'TKH', 'KDT', 'LOE', 'UNN', 'PYY', 'QHO', 'TKT', 'TDK', 'KCM'
+  ]);
+
+  function normalizeFlightNumber(rawFltnr) {
+    const clean = rawFltnr.trim().toUpperCase();
+    const match = clean.match(/^([A-Z0-9]{2})0*(\d+)([A-Z]?)$/);
+    if (match) {
+      const digits = match[2] || '0';
+      return `${match[1]}${digits}${match[3]}`;
+    }
+    const numOnly = clean.match(/^0*(\d+)([A-Z]?)$/);
+    if (numOnly) {
+      return `${numOnly[1] || '0'}${numOnly[2]}`;
+    }
+    return clean;
+  }
+
+  function parseConxMinutes(conxStr) {
+    const m = (conxStr || '').trim().toUpperCase().match(/^(\d{2})H(\d{2})$/);
+    if (!m) return null;
+    return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+  }
+
+  function getConxSeverity(conxMinutes) {
+    if (conxMinutes === null) return null;
+    if (conxMinutes < 30) return 'danger';
+    if (conxMinutes <= 60) return 'warn';
+    return null;
+  }
+
+  function isInterFlight(fltnr, dep) {
+    const origin = (dep || '').trim().toUpperCase();
+    if (origin && TH_DOMESTIC_AIRPORTS.has(origin)) {
+      return false;
+    }
+
+    const match = fltnr.match(/^([A-Z0-9]{2})(\d+)([A-Z]?)$/);
+    if (!match) return true;
+
+    const airline = match[1];
+    const num = parseInt(match[2], 10);
+
+    if (airline === 'TG' && num >= 100 && num <= 299) {
+      return origin ? !TH_DOMESTIC_AIRPORTS.has(origin) : false;
+    }
+
+    return true;
+  }
+
+  function parseAlteaData() {
+    const text = rawInput.value;
+    const lines = text.split(/\r?\n/);
+
+    let currentSection = 'NORMAL';
+    let headerInfo = '';
+    const flights = [];
+
+    const flightRegex = /^\s*([A-Z0-9]{2}\d{1,4}[A-Z]?)\s+([AE]?\d{4})\s+([A-Z]{3})\s+([A-Z]{3})\s+(\d{2}H\d{2})\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*$/i;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+
+      if (/^TG\d+\s+\d{2}[A-Z]{3}\s+[A-Z]{3}/i.test(line)) {
+        headerInfo = line;
+      }
+
+      if (line.includes('POTENTIALLY MISSED INBOUND CONNECTION')) {
+        currentSection = 'MISSED';
+        continue;
+      }
+      if (line.includes('INBOUND CONNECTION') && !line.includes('POTENTIALLY MISSED')) {
+        currentSection = 'NORMAL';
+        continue;
+      }
+
+      const match = line.match(flightRegex);
+      if (match) {
+        const fltnr = normalizeFlightNumber(match[1]);
+        const sta = match[2].toUpperCase();
+        const dep = match[3].toUpperCase();
+        const dest = match[4].toUpperCase();
+        const conx = match[5].toUpperCase();
+        const conxMinutes = parseConxMinutes(conx);
+        const conxSeverity = getConxSeverity(conxMinutes);
+        const bagsTtl = parseInt(match[10], 10);
+        const isMissed = (currentSection === 'MISSED');
+
+        flights.push({
+          fltnr,
+          sta,
+          dep,
+          dest,
+          route: `${dep}-${dest}`,
+          conx,
+          conxMinutes,
+          conxSeverity,
+          isInter: isInterFlight(fltnr, dep),
+          isMissed,
+          bags: bagsTtl
+        });
+      }
+    }
+
+    renderResults(flights, headerInfo);
+  }
+
+  function renderResults(flights, headerInfo) {
+    const banner = document.getElementById('flightBanner');
+    if (headerInfo) {
+      banner.style.display = 'block';
+      banner.textContent = `กระเป๋าต่อเครื่องเข้าเที่ยวบิน: ${headerInfo}`;
+    } else {
+      banner.style.display = 'none';
+    }
+
+    let interBags = 0, interCount = 0;
+    let domBags = 0, domCount = 0;
+    const stationMap = {};
+
+    flights.forEach(f => {
+      if (f.isInter) {
+        interBags += f.bags;
+        interCount++;
+      } else {
+        domBags += f.bags;
+        domCount++;
+      }
+
+      const key = `${f.dep}_${f.isInter ? 'INTER' : 'DOM'}`;
+      if (!stationMap[key]) {
+        stationMap[key] = { dep: f.dep, bags: 0, flightCount: 0, isInter: f.isInter };
+      }
+      stationMap[key].bags += f.bags;
+      stationMap[key].flightCount += 1;
+    });
+
+    document.getElementById('interTotal').textContent = interBags;
+    document.getElementById('interFlights').textContent = `${interCount} ไฟลท์`;
+    document.getElementById('domTotal').textContent = domBags;
+    document.getElementById('domFlights').textContent = `${domCount} ไฟลท์`;
+    document.getElementById('grandTotal').textContent = interBags + domBags;
+    document.getElementById('totalFlights').textContent = `${flights.length} ไฟลท์`;
+
+    const stationContainer = document.getElementById('stationBreakdown');
+    const stations = Object.values(stationMap).sort((a, b) => a.dep.localeCompare(b.dep));
+
+    if (stations.length === 0) {
+      stationContainer.innerHTML = '<div style="color:#94a3b8; font-size:0.86rem;">ไม่พบข้อมูลสถานีต้นทาง</div>';
+    } else {
+      stationContainer.innerHTML = stations.map(s => `
+        <div class="station-item">
+          <div>
+            <div class="station-code">${s.dep}</div>
+            <div class="station-meta">${s.flightCount} ไฟลท์ · ${s.isInter ? 'INTER' : 'DOM'}</div>
+          </div>
+          <div class="station-bags ${s.isInter ? '' : 'dom-val'}">${s.bags}</div>
+        </div>
+      `).join('');
+    }
+
+    const tbody = document.getElementById('resultBody');
+    tbody.innerHTML = '';
+
+    if (flights.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:#94a3b8; padding: 26px;">ยังไม่มีข้อมูล — กรุณาวางข้อความในช่องด้านซ้าย</td></tr>';
+      return;
+    }
+
+    const sortedFlights = [...flights].sort((a, b) =>
+      a.dep.localeCompare(b.dep) || a.fltnr.localeCompare(b.fltnr)
+    );
+
+    sortedFlights.forEach(f => {
+      const notices = [];
+      const alertLevel = f.conxSeverity || (f.isMissed ? 'warn' : null);
+
+      if (f.conxSeverity) {
+        const shortClass = f.conxSeverity === 'danger' ? 'badge-short-danger' : 'badge-short-warn';
+        notices.push(`<span class="badge ${shortClass}">SHORT CONX (${f.conxMinutes}m)</span>`);
+      }
+      if (f.isMissed) {
+        const missClass = alertLevel === 'danger' ? 'badge-miss-danger' : 'badge-miss-warn';
+        notices.push(`<span class="badge ${missClass}">อาจจะไม่ทัน!</span>`);
+      }
+      const noticeHtml = notices.length
+        ? `<div class="notice-line">${notices.join('')}</div>`
+        : `<span class="notice-ok">-</span>`;
+
+      const tr = document.createElement('tr');
+      if (alertLevel === 'danger') {
+        tr.classList.add('short-danger-row');
+      } else if (alertLevel === 'warn') {
+        tr.classList.add('short-warn-row');
+      }
+
+      tr.innerHTML = `
+        <td><strong>${f.dep}</strong></td>
+        <td><strong>${f.fltnr}</strong></td>
+        <td>${f.sta}</td>
+        <td>${f.route}</td>
+        <td><strong>${f.conx}</strong></td>
+        <td><span class="badge ${f.isInter ? 'badge-inter' : 'badge-dom'}">${f.isInter ? 'INTER' : 'DOM'}</span></td>
+        <td>${noticeHtml}</td>
+        <td class="num">${f.bags}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function clearAll() {
+    rawInput.value = '';
+    parseAlteaData();
+  }
+
+  function copySummary() {
+    const inter = document.getElementById('interTotal').textContent;
+    const dom = document.getElementById('domTotal').textContent;
+    const total = document.getElementById('grandTotal').textContent;
+    const banner = document.getElementById('flightBanner').textContent;
+
+    const stations = Array.from(document.querySelectorAll('.station-item')).map(el => {
+      const code = el.querySelector('.station-code').textContent;
+      const bags = el.querySelector('.station-bags').textContent;
+      return `${code}:${bags}`;
+    });
+
+    const shortRows = Array.from(document.querySelectorAll('#resultBody tr.short-danger-row, #resultBody tr.short-warn-row')).map(tr => {
+      const cells = tr.querySelectorAll('td');
+      const level = tr.classList.contains('short-danger-row') ? '<30m' : '30-60m';
+      return `${cells[1].textContent.trim()} (${cells[0].textContent.trim()} ${cells[4].textContent.trim()} [${level}], ${cells[7].textContent.trim()} bags)`;
+    });
+
+    const lines = [
+      banner,
+      `INTER BAGS: ${inter} | DOM BAGS: ${dom} | TOTAL: ${total}`,
+      stations.length ? `BY DEP: ${stations.join(', ')}` : '',
+      shortRows.length ? `SHORT CONX (<=1H): ${shortRows.join(', ')}` : ''
+    ].filter(Boolean);
+
+    const summaryText = lines.join('\n');
+    navigator.clipboard.writeText(summaryText).then(() => {
+      alert('คัดลอกสรุปยอดเรียบร้อยแล้ว:\n\n' + summaryText);
+    });
+  }
+</script>
+
+</body>
+</html>
