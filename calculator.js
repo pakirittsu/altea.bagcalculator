@@ -2,7 +2,7 @@ const APP_VERSION = '1.2.3';
 const HISTORY_STORAGE_KEY = 'altea_clc_search_history_v1';
 const ISSUES_STORAGE_KEY = 'altea_clc_issue_reports_v1';
 const DEV_USERNAME = 'admin';
-const DEV_PASSWORD = '1234';
+const DEV_PASSWORD = '696969';
 const MAX_HISTORY_ITEMS = 30;
 let saveHistoryTimer = null;
 let currentParsedFlights = [];
@@ -387,7 +387,7 @@ function renderIssueTrackerContent() {
   } else {
     listSectionHtml = `
       <div class="issue-card" style="text-align:center; background:#fafafa; color:var(--muted); font-size:0.86rem;">
-        กดปุ่ม <b>ติดตามสถานะที่แจ้งไว้</b> เพื่อดูความคืบหน้า (ระบบจะซ่อนชื่อผู้แจ้ง) หรือกด <b>Dev. Login</b> สำหรับผู้พัฒนาเพื่อดูชื่อผู้แจ้งและแก้ไขสถานะ
+        หากต้องการติดตามสถานะที่แจ้งไว้ สามารถกดดูได้ที่ <b>"ติดตามสถานะที่แจ้งไว้"</b>
       </div>
     `;
   }
