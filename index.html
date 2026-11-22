@@ -50,7 +50,12 @@
     header h1 { margin: 0; font-size: 1.35rem; }
     header span { font-size: 0.88rem; opacity: 0.92; }
 
-    .top-feedback-banner {
+    .top-feedback-bar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
       background: #ffffff;
       border: 1px solid #e9d5ff;
       border-left: 4px solid var(--primary);
@@ -61,6 +66,28 @@
       font-weight: 500;
       margin-bottom: 18px;
       box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+    }
+    .btn-report-issue {
+      background: var(--primary);
+      color: #ffffff;
+      padding: 7px 14px;
+      border-radius: 8px;
+      font-size: 0.84rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    .btn-report-issue:hover {
+      background: var(--primary-light);
+    }
+    .issue-count-pill {
+      background: rgba(255, 255, 255, 0.22);
+      color: #ffffff;
+      padding: 1px 7px;
+      border-radius: 99px;
+      font-size: 0.76rem;
+      font-weight: 700;
     }
 
     .grid { display: grid; grid-template-columns: 1fr 1.55fr; gap: 20px; align-items: start; }
@@ -355,7 +382,7 @@
       background: #ffffff;
       border-radius: 12px;
       width: 100%;
-      max-width: 720px;
+      max-width: 760px;
       max-height: 88vh;
       overflow: hidden;
       display: flex;
@@ -437,6 +464,159 @@
       font-weight: 700;
       line-height: 1.25;
     }
+
+    /* Issue Tracker Styles */
+    .issue-form-card {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 18px;
+    }
+    .issue-form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    @media (max-width: 600px) { .issue-form-row { grid-template-columns: 1fr; } }
+    .issue-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 10px;
+    }
+    .issue-field label {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .issue-input, .issue-select, .issue-textarea {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 7px;
+      font-size: 0.86rem;
+      background: #ffffff;
+      color: var(--text);
+    }
+    .issue-textarea {
+      min-height: 76px;
+      resize: vertical;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    .issue-input:focus, .issue-select:focus, .issue-textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+    .issue-preview-box {
+      margin-top: 8px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .issue-thumb {
+      max-height: 90px;
+      max-width: 150px;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
+      cursor: pointer;
+      object-fit: cover;
+    }
+    .btn-submit-issue {
+      background: var(--primary);
+      color: #ffffff;
+      padding: 8px 16px;
+      border-radius: 7px;
+      font-size: 0.86rem;
+    }
+    .btn-submit-issue:hover { background: var(--primary-light); }
+    .btn-dev-access {
+      background: #f3e8ff;
+      color: var(--primary);
+      border: 1px solid #d8b4fe;
+      padding: 6px 12px;
+      border-radius: 7px;
+      font-size: 0.82rem;
+    }
+    .btn-dev-access:hover { background: #e9d5ff; }
+    .issue-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .issue-card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      background: #ffffff;
+    }
+    .issue-card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 6px;
+    }
+    .issue-reporter {
+      font-weight: 800;
+      color: var(--primary);
+      font-size: 0.9rem;
+    }
+    .issue-time {
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+    .issue-desc {
+      font-size: 0.88rem;
+      color: var(--text);
+      white-space: pre-wrap;
+      line-height: 1.45;
+      margin: 6px 0 10px;
+    }
+    .issue-card-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .report-type-pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 9px;
+      border-radius: 99px;
+      font-size: 0.74rem;
+      font-weight: 700;
+    }
+    .type-bug { background: var(--danger-bg); color: var(--danger-text); border: 1px solid var(--danger-border); }
+    .type-suggestion { background: var(--inter-bg); color: var(--inter-text); border: 1px solid #d8b4fe; }
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 9px;
+      border-radius: 99px;
+      font-size: 0.74rem;
+      font-weight: 700;
+    }
+    .status-pending { background: var(--warn-bg); color: var(--warn-text); border: 1px solid var(--warn-border); }
+    .status-progress { background: var(--dom-bg); color: var(--dom-text); border: 1px solid #93c5fd; }
+    .status-resolved { background: var(--success-bg); color: var(--success-text); border: 1px solid var(--success-border); }
+    .dev-login-box {
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+    .dev-error-msg {
+      color: var(--danger-text);
+      font-size: 0.82rem;
+      font-weight: 700;
+      margin-top: 6px;
+    }
   </style>
 </head>
 <body>
@@ -444,13 +624,16 @@
 <div class="container">
   <header>
     <div>
-      <h1>「Altea CM Inbound Connection DOM / INT Bag Calculator for CLC」 ✦Version 1.2.2✦</h1>
+      <h1>「Altea CM Inbound Connection DOM / INT Bag Calculator for CLC」 ✦Version 1.2.3✦</h1>
       <span>คำนวณยอดกระเป๋าต่อเครื่องเข้าเที่ยวบินหลัก · เรียงตามระยะเวลาต่อเครื่อง CONX (น้อย → มาก) · แจ้งเตือนตามเงื่อนไขเวลาต่อเครื่อง</span>
     </div>
   </header>
 
-  <div class="top-feedback-banner">
-    หากใช้แล้วพบเจอปัญหาบั๊ค หรือยอดไม่ตรง รบกวนส่ง Feedback ให้กับพี่ทีม หรีอน้องฟรุต เพื่อปรับปรุงให้ดียิ่งขึ้น ขอบคุณครับ
+  <div class="top-feedback-bar">
+    <div>หากใช้แล้วพบเจอปัญหา หรืออยากเสนอแนะ รบกวนส่ง Feedback ในช่อง แจ้งปัญหาขวามือ เพื่อปรับปรุงให้ดียิ่งขึ้น ขอบคุณครับ</div>
+    <button type="button" class="btn-report-issue" onclick="openIssueTrackerModal()">
+      แจ้งปัญหา <span id="issueBadgeCount" class="issue-count-pill">0</span>
+    </button>
   </div>
 
   <div class="grid">

@@ -1,16 +1,35 @@
-const APP_VERSION = '1.2.2';
+const APP_VERSION = '1.2.3';
 const HISTORY_STORAGE_KEY = 'altea_clc_search_history_v1';
+const ISSUES_STORAGE_KEY = 'altea_clc_issue_reports_v1';
+const DEV_USERNAME = 'admin';
+const DEV_PASSWORD = '1234';
 const MAX_HISTORY_ITEMS = 30;
 let saveHistoryTimer = null;
 let currentParsedFlights = [];
 let currentHeaderInfo = '';
 let modalBackStack = [];
+let draftIssueImageData = '';
+let isDevAuthenticated = false;
+let showDevLoginForm = false;
+let showUserStatusTracker = false;
+let devLoginError = '';
 
 const SEVERITY_PRIORITY = {
   missed_conx: 4,
   danger: 3,
   warn: 2,
   long: 1
+};
+
+const REPORT_TYPE_MAP = {
+  bug: { label: 'แจ้งปัญหา', cls: 'type-bug' },
+  suggestion: { label: 'ส่งข้อเสนอแนะ', cls: 'type-suggestion' }
+};
+
+const ISSUE_STATUS_MAP = {
+  pending: { label: 'รอดำเนินการ', cls: 'status-pending' },
+  in_progress: { label: 'กำลังแก้ไข', cls: 'status-progress' },
+  resolved: { label: 'แก้ไขแล้ว', cls: 'status-resolved' }
 };
 
 const TH_DOMESTIC_AIRPORTS = new Set([
@@ -95,10 +114,348 @@ function goBackDetailModal() {
 
 function closeDetailModal() {
   modalBackStack = [];
+  showDevLoginForm = false;
+  showUserStatusTracker = false;
+  devLoginError = '';
   renderModalBackButton();
   document.getElementById('detailModal').classList.remove('open');
 }
 
+/* Issue Tracker Functions */
+function loadIssues() {
+  try {
+    const raw = localStorage.getItem(ISSUES_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveIssues(items) {
+  try {
+    localStorage.setItem(ISSUES_STORAGE_KEY, JSON.stringify(items));
+  } catch (e) {
+    alert('พื้นที่จัดเก็บเบราว์เซอร์เต็ม ลองลบรูปภาพขนาดใหญ่หรือลบรายการเก่าออกก่อนครับ');
+  }
+  updateIssueBadgeCount();
+}
+
+function updateIssueBadgeCount() {
+  const badge = document.getElementById('issueBadgeCount');
+  if (!badge) return;
+  const issues = loadIssues();
+  badge.textContent = `${issues.length}`;
+}
+
+function compressImageFile(file, maxWidth = 1024, quality = 0.72) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      img.src = ev.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderDraftImagePreview() {
+  const previewWrap = document.getElementById('issueImagePreview');
+  if (!previewWrap) return;
+  if (!draftIssueImageData) {
+    previewWrap.innerHTML = '';
+    return;
+  }
+  previewWrap.innerHTML = `
+    <img src="${draftIssueImageData}" alt="ตัวอย่างรูปภาพ" class="issue-thumb" onclick="viewFullImage('${draftIssueImageData.replace(/'/g, "\\'")}')">
+    <button type="button" class="btn-mini-clear" onclick="clearDraftIssueImage()">ลบรูป</button>
+  `;
+}
+
+function clearDraftIssueImage() {
+  draftIssueImageData = '';
+  const fileInput = document.getElementById('issueImageFile');
+  if (fileInput) fileInput.value = '';
+  renderDraftImagePreview();
+}
+
+async function handleIssueImageChange(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file || !file.type.startsWith('image/')) return;
+  draftIssueImageData = await compressImageFile(file);
+  renderDraftImagePreview();
+}
+
+function viewFullImage(src) {
+  const html = `
+    <div style="text-align:center;">
+      <img src="${src}" alt="รูปภาพปัญหา" style="max-width:100%; max-height:65vh; border-radius:8px; border:1px solid var(--border);">
+    </div>
+  `;
+  openDetailModal('รูปภาพประกอบการแจ้งปัญหา', html, { pushCurrent: true });
+}
+
+function submitIssueReport(e) {
+  e.preventDefault();
+  const nameInput = document.getElementById('issueReporterName');
+  const typeInput = document.getElementById('issueReportTypeInput');
+  const descInput = document.getElementById('issueDescription');
+
+  const reporterName = nameInput.value.trim();
+  const reportType = typeInput ? typeInput.value : 'bug';
+  const description = descInput.value.trim();
+
+  if (!reporterName || !description) return;
+
+  const issues = loadIssues();
+  issues.unshift({
+    id: Date.now(),
+    reporterName,
+    reportType,
+    description,
+    status: 'pending',
+    imageData: draftIssueImageData || '',
+    version: APP_VERSION,
+    createdAt: new Date().toLocaleString('th-TH', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  });
+
+  saveIssues(issues);
+  draftIssueImageData = '';
+  showUserStatusTracker = true;
+  renderIssueTrackerContent();
+  alert('ส่งข้อมูลเรียบร้อยแล้วครับ ระบบซ่อนชื่อผู้แจ้งในหน้าติดตามสถานะเพื่อความเป็นส่วนตัว');
+}
+
+function toggleUserStatusTracker() {
+  showUserStatusTracker = !showUserStatusTracker;
+  renderIssueTrackerContent();
+}
+
+function openDevLoginPrompt() {
+  if (isDevAuthenticated) {
+    isDevAuthenticated = false;
+    showDevLoginForm = false;
+    devLoginError = '';
+    renderIssueTrackerContent();
+    return;
+  }
+  showDevLoginForm = !showDevLoginForm;
+  devLoginError = '';
+  renderIssueTrackerContent();
+}
+
+function handleDevLoginSubmit(e) {
+  e.preventDefault();
+  const userEl = document.getElementById('devUsernameInput');
+  const passEl = document.getElementById('devPasswordInput');
+  const username = (userEl ? userEl.value : '').trim();
+  const password = passEl ? passEl.value : '';
+
+  if (username === DEV_USERNAME && password === DEV_PASSWORD) {
+    isDevAuthenticated = true;
+    showDevLoginForm = false;
+    devLoginError = '';
+  } else {
+    devLoginError = 'ชื่อผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง';
+  }
+  renderIssueTrackerContent();
+}
+
+function updateIssueStatus(issueId, nextStatus) {
+  if (!isDevAuthenticated) return;
+  const issues = loadIssues();
+  const target = issues.find(item => item.id === issueId);
+  if (!target) return;
+  target.status = nextStatus;
+  saveIssues(issues);
+  renderIssueTrackerContent();
+}
+
+function deleteIssueItem(issueId) {
+  if (!isDevAuthenticated) return;
+  const updated = loadIssues().filter(item => item.id !== issueId);
+  saveIssues(updated);
+  renderIssueTrackerContent();
+}
+
+function renderIssueCards(issues, allowManage = false) {
+  if (issues.length === 0) {
+    return '<div class="history-empty" style="text-align:center; padding:18px;">ยังไม่มีรายการแจ้งปัญหาหรือข้อเสนอแนะ</div>';
+  }
+
+  return `<div class="issue-list">${issues.map(item => {
+    const rt = REPORT_TYPE_MAP[item.reportType] || REPORT_TYPE_MAP.bug;
+    const st = ISSUE_STATUS_MAP[item.status] || ISSUE_STATUS_MAP.pending;
+    const reporterDisplay = allowManage ? escapeHtml(item.reporterName) : 'ผู้แจ้งถูกซ่อนไว้';
+    const imgHtml = item.imageData
+      ? `<div style="margin-bottom:8px;"><img src="${item.imageData}" alt="แนบรูป" class="issue-thumb" onclick="viewFullImage('${item.imageData.replace(/'/g, "\\'")}')"></div>`
+      : '';
+
+    const manageFooterHtml = allowManage ? `
+      <div class="issue-card-footer">
+        <div style="display:flex; align-items:center; gap:6px; font-size:0.8rem;">
+          <span>สถานะดำเนินการ:</span>
+          <select class="issue-select" style="width:auto; padding:4px 8px; font-size:0.8rem;" onchange="updateIssueStatus(${item.id}, this.value)">
+            <option value="pending" ${item.status === 'pending' ? 'selected' : ''}>รอดำเนินการ</option>
+            <option value="in_progress" ${item.status === 'in_progress' ? 'selected' : ''}>กำลังแก้ไข</option>
+            <option value="resolved" ${item.status === 'resolved' ? 'selected' : ''}>แก้ไขแล้ว</option>
+          </select>
+        </div>
+        <button type="button" class="btn-mini-clear" onclick="deleteIssueItem(${item.id})">ลบรายการ</button>
+      </div>
+    ` : `
+      <div class="issue-card-footer" style="font-size:0.8rem; color:var(--muted);">
+        <span>สถานะปัจจุบัน: <b>${escapeHtml(st.label)}</b></span>
+      </div>
+    `;
+
+    return `
+      <div class="issue-card">
+        <div class="issue-card-top">
+          <div>
+            <span class="issue-reporter">${reporterDisplay}</span>
+            <span class="issue-time"> · ${escapeHtml(item.createdAt)} (v${escapeHtml(item.version || APP_VERSION)})</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+            <span class="report-type-pill ${rt.cls}">${rt.label}</span>
+            <span class="status-pill ${st.cls}">${st.label}</span>
+          </div>
+        </div>
+        <div class="issue-desc">${escapeHtml(item.description)}</div>
+        ${imgHtml}
+        ${manageFooterHtml}
+      </div>
+    `;
+  }).join('')}</div>`;
+}
+
+function renderIssueTrackerContent() {
+  const bodyEl = document.getElementById('modalBody');
+  if (!bodyEl) return;
+
+  const issues = loadIssues();
+
+  const devLoginHtml = showDevLoginForm && !isDevAuthenticated ? `
+    <form class="dev-login-box" onsubmit="handleDevLoginSubmit(event)">
+      <div style="font-weight:800; color:var(--primary); margin-bottom:10px; font-size:0.92rem;">
+        Dev. Login — เข้าสู่ระบบสำหรับผู้พัฒนาเพื่อดูชื่อผู้แจ้งและจัดการสถานะ
+      </div>
+      <div class="issue-form-row" style="margin-bottom:8px;">
+        <div class="issue-field" style="margin-bottom:0;">
+          <label for="devUsernameInput">ชื่อผู้ใช้งาน</label>
+          <input id="devUsernameInput" type="text" class="issue-input" required>
+        </div>
+        <div class="issue-field" style="margin-bottom:0;">
+          <label for="devPasswordInput">รหัสผ่าน</label>
+          <input id="devPasswordInput" type="password" class="issue-input" required>
+        </div>
+      </div>
+      ${devLoginError ? `<div class="dev-error-msg">${escapeHtml(devLoginError)}</div>` : ''}
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:10px;">
+        <button type="button" class="btn-clear" onclick="showDevLoginForm=false; devLoginError=''; renderIssueTrackerContent();">ยกเลิก</button>
+        <button type="submit" class="btn-submit-issue">ล็อคอิน</button>
+      </div>
+    </form>
+  ` : '';
+
+  let listSectionHtml = '';
+  if (isDevAuthenticated) {
+    listSectionHtml = renderIssueCards(issues, true);
+  } else if (showUserStatusTracker) {
+    listSectionHtml = renderIssueCards(issues, false);
+  } else {
+    listSectionHtml = `
+      <div class="issue-card" style="text-align:center; background:#fafafa; color:var(--muted); font-size:0.86rem;">
+        กดปุ่ม <b>ติดตามสถานะที่แจ้งไว้</b> เพื่อดูความคืบหน้า (ระบบจะซ่อนชื่อผู้แจ้ง) หรือกด <b>Dev. Login</b> สำหรับผู้พัฒนาเพื่อดูชื่อผู้แจ้งและแก้ไขสถานะ
+      </div>
+    `;
+  }
+
+  bodyEl.innerHTML = `
+    <form class="issue-form-card" onsubmit="submitIssueReport(event)">
+      <div class="issue-form-row">
+        <div class="issue-field" style="margin-bottom:0;">
+          <label for="issueReporterName">ชื่อผู้แจ้ง *</label>
+          <input id="issueReporterName" type="text" class="issue-input" required>
+        </div>
+        <div class="issue-field" style="margin-bottom:0;">
+          <label for="issueReportTypeInput">สิ่งที่อยากรายงาน</label>
+          <select id="issueReportTypeInput" class="issue-select">
+            <option value="bug">แจ้งปัญหา</option>
+            <option value="suggestion">ส่งข้อเสนอแนะ</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="issue-field">
+        <label for="issueDescription">รายละเอียดที่พบหรือข้อเสนอแนะ *</label>
+        <textarea id="issueDescription" class="issue-textarea" placeholder="อธิบายอาการบั๊ค เที่ยวบินที่เจอ หรือข้อเสนอแนะ..." required></textarea>
+      </div>
+
+      <div class="issue-field" style="margin-bottom:10px;">
+        <label for="issueImageFile">แนบรูปภาพ (เลือกไฟล์ หรือกด Ctrl+V วางรูปในหน้าต่างนี้)</label>
+        <input id="issueImageFile" type="file" accept="image/*" class="issue-input" onchange="handleIssueImageChange(event)">
+        <div id="issueImagePreview" class="issue-preview-box"></div>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end;">
+        <button type="submit" class="btn-submit-issue">บันทึกรายการ</button>
+      </div>
+    </form>
+
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+      <div style="font-weight:700; color:var(--primary); font-size:0.95rem;">
+        ${isDevAuthenticated ? `รายการแจ้งปัญหาทั้งหมด (${issues.length})` : `ติดตามสถานะการแก้ไข (${issues.length})`}
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        ${!isDevAuthenticated ? `
+          <button type="button" class="btn-dev-access" onclick="toggleUserStatusTracker()">
+            ${showUserStatusTracker ? 'ซ่อนสถานะ' : 'ติดตามสถานะที่แจ้งไว้'}
+          </button>
+        ` : ''}
+        <button type="button" class="btn-dev-access" onclick="openDevLoginPrompt()">
+          ${isDevAuthenticated ? 'ออกจาก Dev.' : 'Dev. Login'}
+        </button>
+      </div>
+    </div>
+
+    ${devLoginHtml}
+    ${listSectionHtml}
+  `;
+
+  renderDraftImagePreview();
+}
+
+function openIssueTrackerModal() {
+  showDevLoginForm = false;
+  showUserStatusTracker = false;
+  devLoginError = '';
+  openDetailModal('แจ้งปัญหาและส่งข้อเสนอแนะ', '', { clearStack: true });
+  renderIssueTrackerContent();
+}
+
+/* History & Parser Functions */
 function loadHistory() {
   try {
     const raw = localStorage.getItem(HISTORY_STORAGE_KEY);
@@ -699,12 +1056,30 @@ function initCalculator() {
     saveHistoryTimer = setTimeout(recordCurrentFlightToHistory, 400);
   });
 
+  document.addEventListener('paste', async (e) => {
+    const isModalOpen = document.getElementById('detailModal').classList.contains('open');
+    const descriptionEl = document.getElementById('issueDescription');
+    if (!isModalOpen || !descriptionEl) return;
+
+    const items = e.clipboardData && e.clipboardData.items ? Array.from(e.clipboardData.items) : [];
+    const imageItem = items.find(item => item.type && item.type.startsWith('image/'));
+    if (imageItem) {
+      e.preventDefault();
+      const file = imageItem.getAsFile();
+      if (file) {
+        draftIssueImageData = await compressImageFile(file);
+        renderDraftImagePreview();
+      }
+    }
+  });
+
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       closeDetailModal();
     }
   });
 
+  updateIssueBadgeCount();
   renderSearchHistory();
 }
 
