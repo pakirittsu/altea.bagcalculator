@@ -1,4 +1,4 @@
-const APP_VERSION = '1.2.3';
+const APP_VERSION = '1.2.4';
 const HISTORY_STORAGE_KEY = 'altea_clc_search_history_v1';
 const ISSUES_STORAGE_KEY = 'altea_clc_issue_reports_v1';
 const DEV_USERNAME = 'admin';
