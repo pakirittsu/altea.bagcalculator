@@ -1,4 +1,4 @@
-const APP_VERSION = '1.2.5';
+const APP_VERSION = '1.2.6';
 const HISTORY_STORAGE_KEY = 'altea_clc_search_history_v1';
 const ISSUES_STORAGE_KEY = 'altea_clc_issue_reports_v1';
 const ISSUE_API_URL = 'https://script.google.com/macros/s/AKfycbwZpGGxMPOKcM9GtNNX_o4-OlBCnZdDcpgJ3LMXcRgnHaCrVmg_M1dMzfNwnQowFZ7X/exec';
@@ -16,6 +16,7 @@ let showUserStatusTracker = false;
 let devLoginError = '';
 let isSyncingIssues = false;
 let isSubmittingIssue = false;
+let issueSyncError = '';
 
 const SEVERITY_PRIORITY = {
   missed_conx: 4,
@@ -154,23 +155,31 @@ function updateIssueBadgeCount() {
 async function fetchRemoteIssues(forceRender = false) {
   if (!ISSUE_API_URL || isSyncingIssues) return;
   isSyncingIssues = true;
+  issueSyncError = '';
+
+  const isModalOpen = document.getElementById('detailModal').classList.contains('open');
+  if (forceRender && isModalOpen) {
+    renderIssueTrackerContent();
+  }
+
   try {
-    const res = await fetch(`${ISSUE_API_URL}?t=${Date.now()}`, {
-      method: 'GET',
-      cache: 'no-store'
-    });
+    // Simple GET without custom headers so Google Apps Script does not fail CORS preflight
+    const res = await fetch(`${ISSUE_API_URL}?t=${Date.now()}`);
     const data = await res.json();
     if (data && data.ok && Array.isArray(data.issues)) {
       saveIssues(data.issues);
-      const isModalOpen = document.getElementById('detailModal').classList.contains('open');
-      if (forceRender || isModalOpen) {
-        renderIssueTrackerContent();
-      }
+      issueSyncError = '';
+    } else {
+      issueSyncError = 'ไม่สามารถอ่านข้อมูลจาก Google Sheets ได้';
     }
   } catch (err) {
-    // keep cached issues if offline or network is slow
+    issueSyncError = 'เชื่อมต่อข้อมูลกลางไม่สำเร็จ (ตรวจสอบสิทธิ์ Anyone ของ Apps Script)';
   } finally {
     isSyncingIssues = false;
+    const modalStillOpen = document.getElementById('detailModal').classList.contains('open');
+    if (forceRender || modalStillOpen) {
+      renderIssueTrackerContent();
+    }
   }
 }
 
@@ -462,6 +471,10 @@ function renderIssueTrackerContent() {
     </form>
   ` : '';
 
+  const syncBannerHtml = issueSyncError
+    ? `<div class="dev-error-msg" style="margin-bottom:10px;">${escapeHtml(issueSyncError)}</div>`
+    : '';
+
   let listSectionHtml = '';
   if (isDevAuthenticated) {
     listSectionHtml = renderIssueCards(issues, true);
@@ -526,6 +539,7 @@ function renderIssueTrackerContent() {
       </div>
     </div>
 
+    ${syncBannerHtml}
     ${devLoginHtml}
     ${listSectionHtml}
   `;
