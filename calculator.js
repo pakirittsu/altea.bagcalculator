@@ -1,6 +1,7 @@
-const APP_VERSION = '1.2.4';
+const APP_VERSION = '1.2.5';
 const HISTORY_STORAGE_KEY = 'altea_clc_search_history_v1';
 const ISSUES_STORAGE_KEY = 'altea_clc_issue_reports_v1';
+const ISSUE_API_URL = 'https://script.google.com/macros/s/AKfycbwZpGGxMPOKcM9GtNNX_o4-OlBCnZdDcpgJ3LMXcRgnHaCrVmg_M1dMzfNwnQowFZ7X/exec';
 const DEV_USERNAME = 'admin';
 const DEV_PASSWORD = '696969';
 const MAX_HISTORY_ITEMS = 30;
@@ -13,6 +14,8 @@ let isDevAuthenticated = false;
 let showDevLoginForm = false;
 let showUserStatusTracker = false;
 let devLoginError = '';
+let isSyncingIssues = false;
+let isSubmittingIssue = false;
 
 const SEVERITY_PRIORITY = {
   missed_conx: 4,
@@ -136,7 +139,7 @@ function saveIssues(items) {
   try {
     localStorage.setItem(ISSUES_STORAGE_KEY, JSON.stringify(items));
   } catch (e) {
-    alert('พื้นที่จัดเก็บเบราว์เซอร์เต็ม ลองลบรูปภาพขนาดใหญ่หรือลบรายการเก่าออกก่อนครับ');
+    // ignore storage quota error if image cache is large
   }
   updateIssueBadgeCount();
 }
@@ -148,7 +151,42 @@ function updateIssueBadgeCount() {
   badge.textContent = `${issues.length}`;
 }
 
-function compressImageFile(file, maxWidth = 1024, quality = 0.72) {
+async function fetchRemoteIssues(forceRender = false) {
+  if (!ISSUE_API_URL || isSyncingIssues) return;
+  isSyncingIssues = true;
+  try {
+    const res = await fetch(`${ISSUE_API_URL}?t=${Date.now()}`, {
+      method: 'GET',
+      cache: 'no-store'
+    });
+    const data = await res.json();
+    if (data && data.ok && Array.isArray(data.issues)) {
+      saveIssues(data.issues);
+      const isModalOpen = document.getElementById('detailModal').classList.contains('open');
+      if (forceRender || isModalOpen) {
+        renderIssueTrackerContent();
+      }
+    }
+  } catch (err) {
+    // keep cached issues if offline or network is slow
+  } finally {
+    isSyncingIssues = false;
+  }
+}
+
+async function postIssueAction(payload) {
+  if (!ISSUE_API_URL) {
+    return { ok: false, error: 'Missing API URL' };
+  }
+  const res = await fetch(ISSUE_API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(payload)
+  });
+  return await res.json();
+}
+
+function compressImageFile(file, maxWidth = 800, quality = 0.6) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (ev) => {
@@ -210,8 +248,10 @@ function viewFullImage(src) {
   openDetailModal('รูปภาพประกอบการแจ้งปัญหา', html, { pushCurrent: true });
 }
 
-function submitIssueReport(e) {
+async function submitIssueReport(e) {
   e.preventDefault();
+  if (isSubmittingIssue) return;
+
   const nameInput = document.getElementById('issueReporterName');
   const typeInput = document.getElementById('issueReportTypeInput');
   const descInput = document.getElementById('issueDescription');
@@ -222,8 +262,7 @@ function submitIssueReport(e) {
 
   if (!reporterName || !description) return;
 
-  const issues = loadIssues();
-  issues.unshift({
+  const newItem = {
     id: Date.now(),
     reporterName,
     reportType,
@@ -238,18 +277,38 @@ function submitIssueReport(e) {
       hour: '2-digit',
       minute: '2-digit'
     })
-  });
+  };
 
-  saveIssues(issues);
-  draftIssueImageData = '';
-  showUserStatusTracker = true;
+  isSubmittingIssue = true;
   renderIssueTrackerContent();
-  alert('ส่งข้อมูลเรียบร้อยแล้วครับ ระบบซ่อนชื่อผู้แจ้งในหน้าติดตามสถานะเพื่อความเป็นส่วนตัว');
+
+  const currentIssues = loadIssues();
+  saveIssues([newItem, ...currentIssues]);
+
+  try {
+    const result = await postIssueAction({ action: 'create', item: newItem });
+    if (result && result.ok) {
+      draftIssueImageData = '';
+      showUserStatusTracker = true;
+      await fetchRemoteIssues(true);
+      alert('ส่งข้อมูลขึ้นระบบกลางเรียบร้อยแล้วครับ ทุกเครื่องสามารถดูรายการและติดตามสถานะได้ครับ');
+    } else {
+      alert('บันทึกบนเครื่องแล้ว แต่ส่งไปที่ Google Sheets ไม่สำเร็จ กรุณาตรวจสอบสิทธิ์ Web App ครับ');
+    }
+  } catch (err) {
+    alert('บันทึกบนเครื่องแล้ว แต่เชื่อมต่อ Google Sheets ไม่สำเร็จในขณะนี้');
+  } finally {
+    isSubmittingIssue = false;
+    renderIssueTrackerContent();
+  }
 }
 
 function toggleUserStatusTracker() {
   showUserStatusTracker = !showUserStatusTracker;
   renderIssueTrackerContent();
+  if (showUserStatusTracker) {
+    fetchRemoteIssues(true);
+  }
 }
 
 function openDevLoginPrompt() {
@@ -276,27 +335,51 @@ function handleDevLoginSubmit(e) {
     isDevAuthenticated = true;
     showDevLoginForm = false;
     devLoginError = '';
+    renderIssueTrackerContent();
+    fetchRemoteIssues(true);
   } else {
     devLoginError = 'ชื่อผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง';
+    renderIssueTrackerContent();
   }
-  renderIssueTrackerContent();
 }
 
-function updateIssueStatus(issueId, nextStatus) {
+async function updateIssueStatus(issueId, nextStatus) {
   if (!isDevAuthenticated) return;
   const issues = loadIssues();
-  const target = issues.find(item => item.id === issueId);
-  if (!target) return;
-  target.status = nextStatus;
-  saveIssues(issues);
-  renderIssueTrackerContent();
+  const target = issues.find(item => String(item.id) === String(issueId));
+  if (target) {
+    target.status = nextStatus;
+    saveIssues(issues);
+    renderIssueTrackerContent();
+  }
+
+  try {
+    await postIssueAction({
+      action: 'updateStatus',
+      id: issueId,
+      status: nextStatus
+    });
+    await fetchRemoteIssues(true);
+  } catch (err) {
+    // keep local status if offline
+  }
 }
 
-function deleteIssueItem(issueId) {
+async function deleteIssueItem(issueId) {
   if (!isDevAuthenticated) return;
-  const updated = loadIssues().filter(item => item.id !== issueId);
+  const updated = loadIssues().filter(item => String(item.id) !== String(issueId));
   saveIssues(updated);
   renderIssueTrackerContent();
+
+  try {
+    await postIssueAction({
+      action: 'delete',
+      id: issueId
+    });
+    await fetchRemoteIssues(true);
+  } catch (err) {
+    // keep local state if offline
+  }
 }
 
 function renderIssueCards(issues, allowManage = false) {
@@ -420,13 +503,16 @@ function renderIssueTrackerContent() {
       </div>
 
       <div style="display:flex; justify-content:flex-end;">
-        <button type="submit" class="btn-submit-issue">บันทึกรายการ</button>
+        <button type="submit" class="btn-submit-issue" ${isSubmittingIssue ? 'disabled' : ''}>
+          ${isSubmittingIssue ? 'กำลังส่ง...' : 'บันทึกรายการ'}
+        </button>
       </div>
     </form>
 
     <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
       <div style="font-weight:700; color:var(--primary); font-size:0.95rem;">
         ${isDevAuthenticated ? `รายการแจ้งปัญหาทั้งหมด (${issues.length})` : `ติดตามสถานะการแก้ไข (${issues.length})`}
+        ${isSyncingIssues ? '<span style="font-size:0.78rem; color:var(--muted); font-weight:500;"> · กำลังซิงก์...</span>' : ''}
       </div>
       <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
         ${!isDevAuthenticated ? `
@@ -453,6 +539,7 @@ function openIssueTrackerModal() {
   devLoginError = '';
   openDetailModal('แจ้งปัญหาและส่งข้อเสนอแนะ', '', { clearStack: true });
   renderIssueTrackerContent();
+  fetchRemoteIssues(true);
 }
 
 /* History & Parser Functions */
@@ -1081,6 +1168,7 @@ function initCalculator() {
 
   updateIssueBadgeCount();
   renderSearchHistory();
+  fetchRemoteIssues(false);
 }
 
 initCalculator();
